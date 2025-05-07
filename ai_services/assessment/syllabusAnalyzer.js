@@ -118,6 +118,17 @@ Generate exactly ${questionCount} questions, one after another.`;
                     } else if (questionType.includes('true') || questionType.includes('false')) {
                         options = ['True', 'False'];
                         correctAnswer = correctMatch ? correctMatch[1].trim() : 'True';
+                    } else if (questionType.includes('short') || questionType.includes('answer')) {
+                        // Short answer questions - provide a proper text answer
+                        options = []; // Short answer questions don't have options
+                        
+                        // Look for a sample answer in the block, or create a default one
+                        const sampleAnswerMatch = block.match(/Sample\s+Answer:\s*(.*?)(?=\nPoints:|Topic:|$)/i);
+                        const topicForAnswer = topicMatch ? topicMatch[1].trim() : topicsToUse[i % topicsToUse.length];
+                        
+                        correctAnswer = sampleAnswerMatch 
+                            ? sampleAnswerMatch[1].trim() 
+                            : `A comprehensive answer about ${topicForAnswer} should explain the key concepts and demonstrate understanding of the main principles.`;
                     }
                     
                     questions.push({
@@ -231,16 +242,17 @@ function generateFallbackQuestions(topics, count) {
                 explanation: `${topic} is indeed a core concept in this course.`
             });
         } else {
-            // Short answer
+            // Short answer - Fix: Using a proper text answer instead of true/false
             questions.push({
                 id: `q${i+1}`,
                 question: questionFn(topic),
                 questionType: 'short-answer',
+                options: [], // Short answer questions don't have options
                 topic: topic,
                 points: 2,
                 difficulty: 'medium',
                 explanation: `This tests understanding of ${topic} in context.`,
-                correctAnswer: `The answer should demonstrate understanding of ${topic} and its applications.`
+                correctAnswer: `A comprehensive answer should explain the key aspects of ${topic} and demonstrate understanding of its applications.`
             });
         }
     }
@@ -765,9 +777,24 @@ Question 2: ...
             for (let i = 0; i < questionMatches.length; i++) {
                 const questionBlock = questionMatches[i][2];
                 
-                // Extract question details using regex
+                // First extract all metadata we'll need to avoid reference errors
                 const typeMatch = questionBlock.match(/Type:\s*(multiple-choice|true-false|short-answer)/i);
                 const questionType = typeMatch ? typeMatch[1].toLowerCase() : 'multiple-choice';
+                
+                const topicMatch = questionBlock.match(/Topic:\s*(.*?)(?=\s*Difficulty:|$)/i);
+                const topic = topicMatch ? topicMatch[1].trim() : (topics[i % topics.length] || 'General');
+                
+                const difficultyMatch = questionBlock.match(/Difficulty:\s*(Easy|Medium|Hard)/i);
+                const difficulty = difficultyMatch ? difficultyMatch[1] : (pattern.difficulty || 'Medium');
+                
+                const pointsMatch = questionBlock.match(/Points:\s*(\d+)/i);
+                const points = pointsMatch ? parseInt(pointsMatch[1]) : (
+                    questionType === 'multiple-choice' ? 2 : 
+                    questionType === 'true-false' ? 1 : 5
+                );
+                
+                const questionTextMatch = questionBlock.match(/^(.*?)(?=\s*Type:|$)/i);
+                const questionText = questionTextMatch ? questionTextMatch[1].trim() : `Question about ${topic}`;
                 
                 // Extract options for multiple-choice
                 const options = [];
@@ -800,28 +827,25 @@ Question 2: ...
                         }
                     } else if (questionType === 'true-false') {
                         correctAnswer = correctAnswerLetter;
+                    } else if (questionType === 'short-answer') {
+                        // For short answer, instead of using True/False, use a proper text answer
+                        // Look for a sample answer in the question block
+                        const sampleAnswerMatch = questionBlock.match(/Sample\s+Answer:\s*(.*?)(?=\s*Topic:|$)/i);
+                        correctAnswer = sampleAnswerMatch 
+                            ? sampleAnswerMatch[1].trim() 
+                            : `A comprehensive answer should address key concepts related to ${topic} and demonstrate understanding of the core principles.`;
                     }
                 } else {
-                    // Default to first option or "True" if no correct answer specified
-                    correctAnswer = questionType === 'multiple-choice' ? (options[0] || '') : 'True';
+                    // Default answers based on question type
+                    if (questionType === 'multiple-choice') {
+                        correctAnswer = options[0] || '';
+                    } else if (questionType === 'true-false') {
+                        correctAnswer = 'True';
+                    } else if (questionType === 'short-answer') {
+                        // For short answer, provide a sample answer instead of True/False
+                        correctAnswer = `A comprehensive answer should address key concepts related to ${topic} and demonstrate understanding of the core principles.`;
+                    }
                 }
-                
-                // Extract other metadata
-                const topicMatch = questionBlock.match(/Topic:\s*(.*?)(?=\s*Difficulty:|$)/i);
-                const topic = topicMatch ? topicMatch[1].trim() : (topics[i % topics.length] || 'General');
-                
-                const difficultyMatch = questionBlock.match(/Difficulty:\s*(Easy|Medium|Hard)/i);
-                const difficulty = difficultyMatch ? difficultyMatch[1] : (pattern.difficulty || 'Medium');
-                
-                const pointsMatch = questionBlock.match(/Points:\s*(\d+)/i);
-                const points = pointsMatch ? parseInt(pointsMatch[1]) : (
-                    questionType === 'multiple-choice' ? 2 : 
-                    questionType === 'true-false' ? 1 : 5
-                );
-                
-                // Extract the actual question text
-                const questionTextMatch = questionBlock.match(/^(.*?)(?=\s*Type:|$)/i);
-                const questionText = questionTextMatch ? questionTextMatch[1].trim() : `Question about ${topic}`;
                 
                 // Add the question to our array
                 questions.push({

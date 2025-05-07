@@ -1,230 +1,195 @@
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import AutoGraphIcon from '@mui/icons-material/AutoGraph';
-import CancelIcon from '@mui/icons-material/Cancel';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import FaceIcon from '@mui/icons-material/Face';
-import PsychologyIcon from '@mui/icons-material/Psychology';
-import SchoolIcon from '@mui/icons-material/School';
-import TipsAndUpdatesIcon from '@mui/icons-material/TipsAndUpdates';
+import React, { useState, useEffect } from 'react';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import {
-    Accordion,
-    AccordionDetails,
-    AccordionSummary,
-    Box,
-    Button,
-    Card,
-    CardContent,
-    Chip,
-    CircularProgress,
-    Container,
-    Divider,
-    Grid,
-    List,
-    ListItem,
-    ListItemIcon,
-    ListItemText,
-    Paper,
-    Tab,
-    Tabs,
-    TextField,
-    Typography
+  Box,
+  Container,
+  Typography,
+  Paper,
+  Grid,
+  Card,
+  CardContent,
+  Button,
+  CircularProgress,
+  Divider,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Chip,
+  Tabs,
+  Tab,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Alert,
+  LinearProgress
 } from '@mui/material';
-import React, { useEffect, useState } from 'react';
-import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
+import {
+  CheckCircle as CheckCircleIcon,
+  Cancel as CancelIcon,
+  Flag as FlagIcon,
+  ArrowBack as ArrowBackIcon,
+  AssignmentTurnedIn as AssignmentTurnedInIcon,
+  AccessTime as AccessTimeIcon,
+  Timeline as TimelineIcon
+} from '@mui/icons-material';
+import { useAuth } from '../../contexts/AuthContext';
 
-// Mock data for development
+// Mock submission data
 const mockSubmission = {
-  id: '123',
-  assessmentId: '1',
-  courseId: '1',
-  assessmentTitle: 'Introduction to Data Structures',
-  courseTitle: 'Data Structures and Algorithms',
-  submittedAt: '2025-10-15T14:30:00Z',
-  score: 82,
-  maxScore: 100,
-  timeSpent: '52:30', // minutes:seconds
-  questionResults: [
-    {
-      id: '1',
-      question: 'Which data structure operates on a LIFO principle?',
-      questionType: 'Multiple Choice',
-      options: ['Queue', 'Stack', 'Linked List', 'Tree'],
-      yourAnswer: 'Stack',
-      correctAnswer: 'Stack',
-      isCorrect: true,
-      score: 5,
-      maxScore: 5,
-      explanation: 'Stacks follow the Last-In-First-Out (LIFO) principle, where the last element added is the first one to be removed.'
-    },
-    {
-      id: '2',
-      question: 'Explain the difference between a linked list and an array in terms of memory allocation.',
-      questionType: 'Short Answer',
-      yourAnswer: 'Arrays allocate memory in a contiguous block, while linked lists allocate memory for each node separately with pointers connecting them.',
-      correctAnswer: null, // No simple "correct" answer for short answer
-      isCorrect: null,
-      score: 8,
-      maxScore: 10,
-      explanation: 'Good explanation, but could have mentioned that arrays have fixed size allocation while linked lists can grow dynamically.',
-      feedback: 'Your answer correctly identifies the key difference in memory allocation patterns. To improve, consider discussing the implications of these patterns on operations like insertion and deletion.'
-    },
-    {
-      id: '3',
-      question: 'Implement a simple queue using two stacks.',
-      questionType: 'Programming',
-      yourAnswer: `class Queue {
-  constructor() {
-    this.stackIn = [];
-    this.stackOut = [];
-  }
-  
-  enqueue(item) {
-    this.stackIn.push(item);
-  }
-  
-  dequeue() {
-    if (this.stackOut.length === 0) {
-      while (this.stackIn.length > 0) {
-        this.stackOut.push(this.stackIn.pop());
+  id: '1',
+  assessment: {
+    id: '1',
+    title: 'Midterm Exam',
+    courseId: '1',
+    courseName: 'Data Structures and Algorithms',
+    description: 'Comprehensive evaluation of your understanding of data structures',
+    timeLimit: 90, // in minutes
+    totalPoints: 100,
+    questions: [
+      {
+        id: 'q1',
+        text: 'Which data structure uses LIFO (Last In First Out) principle?',
+        type: 'multiple-choice',
+        options: ['Queue', 'Stack', 'Linked List', 'Tree'],
+        correctAnswer: 'Stack',
+        points: 5
+      },
+      {
+        id: 'q2',
+        text: 'What is the time complexity of binary search?',
+        type: 'multiple-choice',
+        options: ['O(1)', 'O(log n)', 'O(n)', 'O(n log n)'],
+        correctAnswer: 'O(log n)',
+        points: 5
+      },
+      {
+        id: 'q3',
+        text: 'Explain the difference between a stack and a queue.',
+        type: 'short-answer',
+        correctAnswer: 'A stack follows LIFO (Last In First Out) principle where elements are added and removed from the same end, while a queue follows FIFO (First In First Out) principle where elements are added at one end and removed from the other end.',
+        points: 10
+      },
+      {
+        id: 'q4',
+        text: 'Which of the following are valid operations on a binary search tree? (Select all that apply)',
+        type: 'multiple-select',
+        options: ['Insertion', 'Deletion', 'In-order traversal', 'Level order traversal'],
+        correctAnswer: ['Insertion', 'Deletion', 'In-order traversal', 'Level order traversal'],
+        points: 10
+      },
+      {
+        id: 'q5',
+        text: 'True or False: A hash table provides O(1) average time complexity for insertions and lookups.',
+        type: 'true-false',
+        correctAnswer: true,
+        points: 5
       }
+    ]
+  },
+  student: {
+    id: '1',
+    name: 'Student Name',
+    email: 'student@example.com'
+  },
+  answers: {
+    'q1': 'Stack',
+    'q2': 'O(log n)',
+    'q3': 'A stack uses LIFO (Last In First Out) where elements are added and removed from the top. A queue uses FIFO (First In First Out) where elements are added at the back and removed from the front.',
+    'q4': ['Insertion', 'Deletion', 'In-order traversal'],
+    'q5': true
+  },
+  score: 25,
+  maxScore: 35,
+  submittedAt: '2025-10-12T15:30:00',
+  timeSpent: 42, // in minutes
+  feedback: {
+    overallFeedback: 'Good understanding of basic data structures. Continue practicing with more complex operations on trees and graphs.',
+    questionFeedback: {
+      'q3': 'Good explanation of the basic principles, but could elaborate more on the implementation differences.',
+      'q4': 'You missed "Level order traversal" which is also a valid operation on BSTs.'
     }
-    return this.stackOut.pop();
-  }
-  
-  peek() {
-    if (this.stackOut.length === 0) {
-      while (this.stackIn.length > 0) {
-        this.stackOut.push(this.stackIn.pop());
-      }
-    }
-    return this.stackOut[this.stackOut.length - 1];
-  }
-  
-  isEmpty() {
-    return this.stackIn.length === 0 && this.stackOut.length === 0;
-  }
-}`,
-      correctAnswer: null,
-      isCorrect: null,
-      score: 14,
-      maxScore: 15,
-      explanation: 'Your implementation correctly uses two stacks to simulate queue behavior.',
-      feedback: 'Your implementation correctly follows the two-stack approach. The time complexity for enqueue is O(1), while dequeue is amortized O(1). A minor improvement would be adding error handling for dequeue and peek operations when the queue is empty.'
-    },
-    {
-      id: '4',
-      question: 'What is the time complexity of insertion in a balanced binary search tree?',
-      questionType: 'Multiple Choice',
-      options: ['O(1)', 'O(log n)', 'O(n)', 'O(n log n)'],
-      yourAnswer: 'O(n)',
-      correctAnswer: 'O(log n)',
-      isCorrect: false,
-      score: 0,
-      maxScore: 5,
-      explanation: 'In a balanced binary search tree, the time complexity for insertion is O(log n) because the height of the tree is logarithmic to the number of nodes.'
-    },
-    {
-      id: '5',
-      question: 'Explain how hash collisions can be resolved in hash tables.',
-      questionType: 'Essay',
-      yourAnswer: 'Hash collisions can be resolved using methods like chaining and open addressing. In chaining, each bucket contains a linked list of elements that hash to the same bucket. In open addressing, we find another empty slot in the hash table by using a probing sequence. Probing methods include linear probing, quadratic probing, and double hashing.',
-      correctAnswer: null,
-      isCorrect: null,
-      score: 12,
-      maxScore: 15,
-      explanation: 'Your answer covers the main collision resolution strategies.',
-      feedback: 'Your answer correctly identifies the two main collision resolution strategies: chaining and open addressing. You also mentioned the different probing techniques for open addressing. To improve, you could have discussed the pros and cons of each approach and when one might be preferred over the other.'
-    }
-  ],
-  expertFeedback: [
-    {
-      expertName: 'Dr. Algorithm',
-      expertTitle: 'Data Structures Specialist',
-      avatar: '/assets/experts/algorithm.jpg',
-      generalFeedback: 'Overall, you demonstrate a good understanding of basic data structures concepts. Your implementation skills are strong, as shown in the programming question.',
-      strengthAreas: ['Algorithm implementation', 'Understanding of stack operations'],
-      improvementAreas: ['Time complexity analysis', 'Hash table collision resolution strategies'],
-      suggestedResources: [
-        {
-          title: 'Introduction to Algorithms',
-          type: 'Book',
-          link: '#'
-        },
-        {
-          title: 'Time Complexity Deep Dive',
-          type: 'Video',
-          link: '#'
-        }
-      ]
-    },
-    {
-      expertName: 'Prof. DataMaster',
-      expertTitle: 'Computer Science Educator',
-      avatar: '/assets/experts/datamaster.jpg',
-      generalFeedback: 'You show promise in your understanding of data structures. Your written explanations are clear and concise, but there are some gaps in your theoretical knowledge.',
-      strengthAreas: ['Clear explanations', 'Good coding style'],
-      improvementAreas: ['Understanding of balanced trees', 'Theoretical concepts'],
-      suggestedResources: [
-        {
-          title: 'Visualizing Data Structures',
-          type: 'Interactive Tool',
-          link: '#'
-        },
-        {
-          title: 'Advanced Data Structures Course',
-          type: 'Online Course',
-          link: '#'
-        }
-      ]
-    }
-  ],
-  learningRecommendations: [
-    {
-      topic: 'Balanced Binary Search Trees',
-      confidence: 'low',
-      recommendedResources: [
-        {
-          title: 'AVL Trees Explained',
-          type: 'Article',
-          link: '#'
-        },
-        {
-          title: 'Red-Black Trees: A Visual Introduction',
-          type: 'Video',
-          link: '#'
-        }
-      ]
-    },
-    {
-      topic: 'Time Complexity Analysis',
-      confidence: 'medium',
-      recommendedResources: [
-        {
-          title: 'Big O Notation and Algorithm Analysis',
-          type: 'Tutorial',
-          link: '#'
-        }
-      ]
-    }
+  },
+  conceptMastery: [
+    { concept: 'Stacks', masteryLevel: 90 },
+    { concept: 'Queues', masteryLevel: 85 },
+    { concept: 'Binary Search Trees', masteryLevel: 70 },
+    { concept: 'Algorithm Complexity', masteryLevel: 80 }
   ]
 };
+
+function TabPanel(props) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`simple-tabpanel-${index}`}
+      aria-labelledby={`simple-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ py: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
 
 const SubmissionResults = () => {
   const { submissionId } = useParams();
   const navigate = useNavigate();
-  const [submission, setSubmission] = useState(null);
+  const location = useLocation();
+  const { currentUser } = useAuth();
+  
   const [loading, setLoading] = useState(true);
+  const [submission, setSubmission] = useState(null);
   const [activeTab, setActiveTab] = useState(0);
-
-  // Load submission data
+  
+  // Fetch submission data or use state from previous page
   useEffect(() => {
-    // In a real application, you would fetch the submission data from an API
-    // For this demo, we'll use the mock data
-    setSubmission(mockSubmission);
-    setLoading(false);
-  }, [submissionId]);
-
+    if (location.state?.score !== undefined) {
+      // If navigated from assessment take with state
+      const { score, maxScore, answers, assessment } = location.state;
+      
+      // Create a submission object from the state
+      const createdSubmission = {
+        id: submissionId || '1',
+        assessment,
+        student: {
+          id: currentUser?.id || '1',
+          name: currentUser?.name || 'Student Name',
+          email: currentUser?.email || 'student@example.com'
+        },
+        answers,
+        score,
+        maxScore,
+        submittedAt: new Date().toISOString(),
+        timeSpent: assessment.timeLimit || 60, // Default to time limit if actual time not tracked
+        feedback: {
+          overallFeedback: 'This is automated feedback based on your submission.',
+          questionFeedback: {}
+        },
+        conceptMastery: []
+      };
+      
+      setSubmission(createdSubmission);
+      setLoading(false);
+    } else {
+      // If directly navigated to this page, fetch the submission data
+      // In a real app, you would fetch from an API
+      setTimeout(() => {
+        setSubmission(mockSubmission);
+        setLoading(false);
+      }, 1000);
+    }
+  }, [submissionId, location, currentUser]);
+  
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
   };
@@ -267,376 +232,394 @@ const SubmissionResults = () => {
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Box sx={{ mb: 4, display: 'flex', alignItems: 'center' }}>
-        <Button 
-          startIcon={<ArrowBackIcon />} 
-          onClick={() => navigate('/dashboard')} 
-          variant="outlined"
-          sx={{ mr: 2 }}
-        >
-          Back to Dashboard
-        </Button>
-        <Typography variant="h4" component="h1">
-          Assessment Results
-        </Typography>
-      </Box>
-
-      {/* Summary Card */}
-      <Paper elevation={3} sx={{ p: 3, mb: 4, borderRadius: 2 }}>
-        <Grid container spacing={2}>
-          <Grid item xs={12} md={8}>
+      <Button 
+        startIcon={<ArrowBackIcon />} 
+        onClick={() => navigate('/dashboard')}
+        sx={{ mb: 3 }}
+      >
+        Back to Dashboard
+      </Button>
+      
+      {/* Results Header */}
+      <Paper elevation={3} sx={{ p: 3, mb: 3, borderRadius: 2 }}>
+        <Grid container spacing={3} alignItems="center">
+          <Grid item xs={12} md={7}>
+            <Typography variant="h4" gutterBottom>
+              Assessment Results
+            </Typography>
             <Typography variant="h5" gutterBottom>
-              {submission.assessmentTitle}
+              {submission.assessment.title}
             </Typography>
             <Typography variant="subtitle1" color="text.secondary" gutterBottom>
-              {submission.courseTitle}
+              {submission.assessment.courseName}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Submitted on {new Date(submission.submittedAt).toLocaleString()}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Time spent: {submission.timeSpent}
+              Submitted: {new Date(submission.submittedAt).toLocaleString()}
             </Typography>
           </Grid>
-          <Grid item xs={12} md={4}>
-            <Box sx={{ textAlign: 'center' }}>
-              <Typography variant="h5" gutterBottom>
-                Your Score
-              </Typography>
-              <Box sx={{ position: 'relative', display: 'inline-block' }}>
-                <CircularProgress 
-                  variant="determinate" 
-                  value={scorePercentage} 
-                  size={100} 
-                  thickness={5}
-                  sx={{ color: scoreColor }}
-                />
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    bottom: 0,
-                    right: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Typography variant="h4" component="div" color={scoreColor}>
-                    {scorePercentage.toFixed(0)}%
-                  </Typography>
-                </Box>
+          <Grid item xs={12} md={5}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: { xs: 'flex-start', md: 'flex-end' } }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <Typography variant="h3" color={scoreColor} sx={{ fontWeight: 'bold' }}>
+                  {Math.round(scorePercentage)}%
+                </Typography>
+                <Typography variant="h6" color="text.secondary" sx={{ ml: 1.5 }}>
+                  ({submission.score}/{submission.maxScore} points)
+                </Typography>
               </Box>
-              <Typography variant="body1" sx={{ mt: 1 }}>
-                {submission.score} / {submission.maxScore} points
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                <Chip 
+                  icon={<AssignmentTurnedInIcon />} 
+                  label={`${submission.assessment.questions.length} Questions`} 
+                  variant="outlined" 
+                />
+                <Chip 
+                  icon={<AccessTimeIcon />} 
+                  label={`${submission.timeSpent} minutes`} 
+                  variant="outlined" 
+                />
+              </Box>
             </Box>
           </Grid>
         </Grid>
       </Paper>
-
-      {/* Tabs Navigation */}
-      <Box sx={{ width: '100%', mb: 3 }}>
-        <Tabs 
-          value={activeTab} 
-          onChange={handleTabChange} 
-          variant="fullWidth"
-          textColor="primary"
-          indicatorColor="primary"
-        >
-          <Tab icon={<AutoGraphIcon />} label="Question Breakdown" iconPosition="start" />
-          <Tab icon={<PsychologyIcon />} label="Expert Feedback" iconPosition="start" />
-          <Tab icon={<TipsAndUpdatesIcon />} label="Next Steps" iconPosition="start" />
+      
+      {/* Results Tabs */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        <Tabs value={activeTab} onChange={handleTabChange} aria-label="results tabs">
+          <Tab label="Question Review" />
+          <Tab label="Performance Analysis" />
+          <Tab label="Feedback" />
         </Tabs>
       </Box>
-
-      {/* Question Breakdown Tab */}
-      <Box hidden={activeTab !== 0}>
-        <Typography variant="h5" gutterBottom>
-          Question Breakdown
+      
+      {/* Question Review Tab */}
+      <TabPanel value={activeTab} index={0}>
+        <Typography variant="h6" gutterBottom>
+          Questions and Answers
         </Typography>
         
-        {submission.questionResults.map((result, index) => (
-          <Accordion key={result.id} defaultExpanded={index === 0} sx={{ mb: 2 }}>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                <Box sx={{ mr: 2 }}>
-                  {result.isCorrect === true ? (
-                    <CheckCircleIcon color="success" />
-                  ) : result.isCorrect === false ? (
-                    <CancelIcon color="error" />
-                  ) : (
-                    <CheckCircleIcon color="action" />
-                  )}
-                </Box>
-                <Typography sx={{ flexGrow: 1 }} variant="subtitle1">
-                  Question {index + 1}: {result.question.length > 60 ? `${result.question.substring(0, 60)}...` : result.question}
-                </Typography>
-                <Chip 
-                  label={`${result.score}/${result.maxScore}`} 
-                  color={result.score === result.maxScore ? 'success' : 'primary'} 
-                  sx={{ ml: 2 }}
-                />
-              </Box>
-            </AccordionSummary>
-            <AccordionDetails>
-              <Grid container spacing={3}>
-                <Grid item xs={12}>
-                  <Typography variant="h6" gutterBottom>
-                    {result.question}
+        {submission.assessment.questions.map((question, index) => {
+          const userAnswer = submission.answers[question.id];
+          const isCorrect = 
+            question.type === 'multiple-choice' || question.type === 'true-false' 
+              ? userAnswer === question.correctAnswer
+              : question.type === 'multiple-select'
+                ? userAnswer && userAnswer.length === question.correctAnswer.length && 
+                  userAnswer.every(a => question.correctAnswer.includes(a))
+                : false; // For short answer, we don't do simple comparison
+          
+          return (
+            <Card key={question.id} variant="outlined" sx={{ mb: 3 }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                  <Typography variant="subtitle1" fontWeight="bold">
+                    Question {index + 1}
                   </Typography>
-                  <Chip 
-                    label={result.questionType} 
-                    size="small" 
-                    color="primary" 
-                    variant="outlined"
-                    sx={{ mb: 2 }}
-                  />
-                  
-                  {/* Display multiple choice options if applicable */}
-                  {result.questionType === 'Multiple Choice' && (
-                    <Box sx={{ mt: 1, mb: 2 }}>
-                      {result.options.map((option, idx) => (
-                        <Box 
-                          key={idx} 
-                          sx={{ 
-                            p: 1, 
-                            mb: 1, 
-                            border: '1px solid',
-                            borderColor: 
-                              option === result.correctAnswer ? 'success.main' : 
-                              option === result.yourAnswer && result.yourAnswer !== result.correctAnswer ? 'error.main' : 
-                              'divider',
-                            borderRadius: 1,
-                            bgcolor: 
-                              option === result.correctAnswer ? 'success.light' : 
-                              option === result.yourAnswer && result.yourAnswer !== result.correctAnswer ? 'error.light' : 
-                              'background.paper',
-                            display: 'flex',
-                            alignItems: 'center'
-                          }}
-                        >
-                          {option === result.correctAnswer && <CheckCircleIcon color="success" sx={{ mr: 1 }} />}
-                          {option === result.yourAnswer && option !== result.correctAnswer && <CancelIcon color="error" sx={{ mr: 1 }} />}
-                          <Typography>{option}</Typography>
-                        </Box>
-                      ))}
-                    </Box>
-                  )}
-                  
-                  {/* Display your answer for non-multiple choice questions */}
-                  {result.questionType !== 'Multiple Choice' && (
-                    <Box sx={{ mt: 2, mb: 3 }}>
-                      <Typography variant="subtitle2" gutterBottom>
-                        Your Response:
-                      </Typography>
-                      <TextField
-                        multiline
-                        fullWidth
-                        variant="outlined"
-                        value={result.yourAnswer}
-                        InputProps={{
-                          readOnly: true,
-                          style: result.questionType === 'Programming' ? { fontFamily: 'monospace' } : {}
-                        }}
-                        minRows={result.questionType === 'Programming' ? 8 : 3}
-                      />
-                    </Box>
-                  )}
-                  
-                  {/* Display explanation and feedback */}
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="subtitle2" gutterBottom>
-                      Explanation:
-                    </Typography>
-                    <Typography variant="body2" paragraph>
-                      {result.explanation}
-                    </Typography>
-                    
-                    {result.feedback && (
-                      <>
-                        <Typography variant="subtitle2" gutterBottom>
-                          Feedback:
-                        </Typography>
-                        <Typography variant="body2">
-                          {result.feedback}
-                        </Typography>
-                      </>
-                    )}
-                  </Box>
-                </Grid>
-              </Grid>
-            </AccordionDetails>
-          </Accordion>
-        ))}
-      </Box>
-
-      {/* Expert Feedback Tab */}
-      <Box hidden={activeTab !== 1}>
-        <Typography variant="h5" gutterBottom>
-          Expert Feedback
-        </Typography>
-        
-        <Grid container spacing={3}>
-          {submission.expertFeedback.map((expert, index) => (
-            <Grid item xs={12} key={index}>
-              <Card elevation={3} sx={{ mb: 3 }}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                    <Box 
-                      sx={{ 
-                        width: 60, 
-                        height: 60, 
-                        borderRadius: '50%', 
-                        bgcolor: 'primary.light',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        mr: 2
-                      }}
-                    >
-                      <FaceIcon sx={{ fontSize: 32, color: 'primary.main' }} />
-                    </Box>
-                    <Box>
-                      <Typography variant="h6">
-                        {expert.expertName}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {expert.expertTitle}
-                      </Typography>
-                    </Box>
-                  </Box>
-                  
-                  <Typography variant="body1" paragraph>
-                    {expert.generalFeedback}
-                  </Typography>
-                  
-                  <Typography variant="subtitle2" gutterBottom>
-                    Strengths:
-                  </Typography>
-                  <List dense>
-                    {expert.strengthAreas.map((strength, idx) => (
-                      <ListItem key={idx} sx={{ py: 0 }}>
-                        <ListItemIcon sx={{ minWidth: 36 }}>
-                          <CheckCircleIcon color="success" fontSize="small" />
-                        </ListItemIcon>
-                        <ListItemText primary={strength} />
-                      </ListItem>
-                    ))}
-                  </List>
-                  
-                  <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
-                    Areas for Improvement:
-                  </Typography>
-                  <List dense>
-                    {expert.improvementAreas.map((area, idx) => (
-                      <ListItem key={idx} sx={{ py: 0 }}>
-                        <ListItemIcon sx={{ minWidth: 36 }}>
-                          <TipsAndUpdatesIcon color="warning" fontSize="small" />
-                        </ListItemIcon>
-                        <ListItemText primary={area} />
-                      </ListItem>
-                    ))}
-                  </List>
-                  
-                  <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
-                    Suggested Resources:
-                  </Typography>
-                  <List dense>
-                    {expert.suggestedResources.map((resource, idx) => (
-                      <ListItem key={idx} sx={{ py: 0 }}>
-                        <ListItemIcon sx={{ minWidth: 36 }}>
-                          <SchoolIcon color="primary" fontSize="small" />
-                        </ListItemIcon>
-                        <ListItemText 
-                          primary={
-                            <Button href={resource.link} color="primary" sx={{ p: 0, textTransform: 'none', textAlign: 'left' }}>
-                              {resource.title}
-                            </Button>
-                          } 
-                          secondary={resource.type}
-                        />
-                      </ListItem>
-                    ))}
-                  </List>
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
-      </Box>
-
-      {/* Next Steps Tab */}
-      <Box hidden={activeTab !== 2}>
-        <Typography variant="h5" gutterBottom>
-          Personalized Learning Recommendations
-        </Typography>
-        <Typography variant="body1" paragraph>
-          Based on your assessment results, we've identified the following areas for focused study:
-        </Typography>
-        
-        <Grid container spacing={3}>
-          {submission.learningRecommendations.map((rec, index) => (
-            <Grid item xs={12} md={6} key={index}>
-              <Card elevation={3}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography variant="h6">
-                      {rec.topic}
-                    </Typography>
+                  <Box>
                     <Chip 
-                      label={`${rec.confidence} confidence`}
-                      color={
-                        rec.confidence === 'high' ? 'success' : 
-                        rec.confidence === 'medium' ? 'primary' : 
-                        'warning'
-                      }
+                      icon={isCorrect ? <CheckCircleIcon /> : <CancelIcon />} 
+                      label={isCorrect ? 'Correct' : 'Incorrect'} 
+                      color={isCorrect ? 'success' : 'error'} 
                       size="small"
+                      sx={{ mr: 1 }}
+                    />
+                    <Chip 
+                      label={`${question.points} pts`} 
+                      variant="outlined" 
+                      size="small" 
                     />
                   </Box>
+                </Box>
+                
+                <Typography variant="body1" paragraph>
+                  {question.text}
+                </Typography>
+                
+                <Divider sx={{ my: 2 }} />
+                
+                <Grid container spacing={3}>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                      Your Answer:
+                    </Typography>
+                    
+                    {/* Render user answer based on question type */}
+                    {question.type === 'multiple-choice' && (
+                      <Typography variant="body1">
+                        {userAnswer || <em>No answer provided</em>}
+                      </Typography>
+                    )}
+                    
+                    {question.type === 'true-false' && (
+                      <Typography variant="body1">
+                        {userAnswer === true ? 'True' : userAnswer === false ? 'False' : <em>No answer provided</em>}
+                      </Typography>
+                    )}
+                    
+                    {question.type === 'short-answer' && (
+                      <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                        {userAnswer || <em>No answer provided</em>}
+                      </Typography>
+                    )}
+                    
+                    {question.type === 'multiple-select' && (
+                      <List dense>
+                        {userAnswer && userAnswer.length > 0 ? (
+                          userAnswer.map((option, idx) => (
+                            <ListItem key={idx}>
+                              <ListItemIcon sx={{ minWidth: 28 }}>
+                                <CheckCircleIcon color={question.correctAnswer.includes(option) ? 'success' : 'error'} fontSize="small" />
+                              </ListItemIcon>
+                              <ListItemText primary={option} />
+                            </ListItem>
+                          ))
+                        ) : (
+                          <ListItem>
+                            <ListItemText primary={<em>No answer provided</em>} />
+                          </ListItem>
+                        )}
+                      </List>
+                    )}
+                  </Grid>
                   
-                  <Divider sx={{ mb: 2 }} />
-                  
-                  <Typography variant="subtitle2" gutterBottom>
-                    Recommended Resources:
-                  </Typography>
-                  <List dense>
-                    {rec.recommendedResources.map((resource, idx) => (
-                      <ListItem key={idx} sx={{ py: 0.5 }}>
-                        <ListItemIcon sx={{ minWidth: 36 }}>
-                          <SchoolIcon color="primary" fontSize="small" />
-                        </ListItemIcon>
-                        <ListItemText 
-                          primary={
-                            <Button href={resource.link} color="primary" sx={{ p: 0, textTransform: 'none', textAlign: 'left' }}>
-                              {resource.title}
-                            </Button>
-                          } 
-                          secondary={resource.type}
-                        />
-                      </ListItem>
-                    ))}
-                  </List>
-                </CardContent>
-              </Card>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                      Correct Answer:
+                    </Typography>
+                    
+                    {question.type === 'multiple-choice' && (
+                      <Typography variant="body1">
+                        {question.correctAnswer}
+                      </Typography>
+                    )}
+                    
+                    {question.type === 'true-false' && (
+                      <Typography variant="body1">
+                        {question.correctAnswer ? 'True' : 'False'}
+                      </Typography>
+                    )}
+                    
+                    {question.type === 'short-answer' && (
+                      <Typography variant="body1" color="text.secondary" sx={{ whiteSpace: 'pre-wrap' }}>
+                        <em>Sample answer:</em> {question.correctAnswer}
+                      </Typography>
+                    )}
+                    
+                    {question.type === 'multiple-select' && (
+                      <List dense>
+                        {question.correctAnswer.map((option, idx) => (
+                          <ListItem key={idx}>
+                            <ListItemIcon sx={{ minWidth: 28 }}>
+                              <CheckCircleIcon color="success" fontSize="small" />
+                            </ListItemIcon>
+                            <ListItemText primary={option} />
+                          </ListItem>
+                        ))}
+                      </List>
+                    )}
+                  </Grid>
+                </Grid>
+                
+                {/* Show feedback if available */}
+                {submission.feedback.questionFeedback && submission.feedback.questionFeedback[question.id] && (
+                  <Alert severity="info" sx={{ mt: 2 }}>
+                    <Typography variant="subtitle2">Feedback:</Typography>
+                    <Typography variant="body2">
+                      {submission.feedback.questionFeedback[question.id]}
+                    </Typography>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </TabPanel>
+      
+      {/* Performance Analysis Tab */}
+      <TabPanel value={activeTab} index={1}>
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={6}>
+            <Paper elevation={2} sx={{ p: 3, borderRadius: 2 }}>
+              <Typography variant="h6" gutterBottom>
+                Score Breakdown
+              </Typography>
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Category</TableCell>
+                      <TableCell align="right">Your Score</TableCell>
+                      <TableCell align="right">Max Score</TableCell>
+                      <TableCell align="right">Percentage</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell>Overall</TableCell>
+                      <TableCell align="right">{submission.score}</TableCell>
+                      <TableCell align="right">{submission.maxScore}</TableCell>
+                      <TableCell align="right">{Math.round(scorePercentage)}%</TableCell>
+                    </TableRow>
+                    {/* You could add category breakdowns here */}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
+          </Grid>
+          
+          <Grid item xs={12} md={6}>
+            <Paper elevation={2} sx={{ p: 3, borderRadius: 2 }}>
+              <Typography variant="h6" gutterBottom>
+                Time Analysis
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 2 }}>
+                <Typography variant="body1">
+                  Time Spent:
+                </Typography>
+                <Typography variant="body1" fontWeight="bold">
+                  {submission.timeSpent} minutes
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1 }}>
+                <Typography variant="body1">
+                  Time Limit:
+                </Typography>
+                <Typography variant="body1">
+                  {submission.assessment.timeLimit} minutes
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1 }}>
+                <Typography variant="body1">
+                  Time Utilization:
+                </Typography>
+                <Typography variant="body1" fontWeight="bold" color={submission.timeSpent <= submission.assessment.timeLimit ? 'success.main' : 'error.main'}>
+                  {Math.round((submission.timeSpent / submission.assessment.timeLimit) * 100)}%
+                </Typography>
+              </Box>
+            </Paper>
+          </Grid>
+          
+          {submission.conceptMastery && submission.conceptMastery.length > 0 && (
+            <Grid item xs={12}>
+              <Paper elevation={2} sx={{ p: 3, borderRadius: 2 }}>
+                <Typography variant="h6" gutterBottom>
+                  Concept Mastery
+                </Typography>
+                <Grid container spacing={2} sx={{ mt: 1 }}>
+                  {submission.conceptMastery.map((concept, index) => (
+                    <Grid item xs={12} sm={6} md={3} key={index}>
+                      <Card variant="outlined">
+                        <CardContent>
+                          <Typography variant="subtitle1" gutterBottom>
+                            {concept.concept}
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+                            <Box sx={{ width: '100%', mr: 1 }}>
+                              <LinearProgress 
+                                variant="determinate" 
+                                value={concept.masteryLevel} 
+                                color={
+                                  concept.masteryLevel >= 80 ? 'success' :
+                                  concept.masteryLevel >= 60 ? 'primary' :
+                                  concept.masteryLevel >= 40 ? 'warning' : 'error'
+                                }
+                                sx={{ height: 10, borderRadius: 5 }}
+                              />
+                            </Box>
+                            <Typography variant="body2" color="text.secondary">
+                              {concept.masteryLevel}%
+                            </Typography>
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+              </Paper>
             </Grid>
-          ))}
+          )}
         </Grid>
-        
-        <Box sx={{ mt: 4, textAlign: 'center' }}>
-          <Button 
-            variant="contained" 
-            color="primary" 
-            size="large"
-            component={RouterLink}
-            to={`/learning-path/${submission.courseId}`}
-            startIcon={<AutoGraphIcon />}
-          >
-            View Complete Learning Path
-          </Button>
-        </Box>
-      </Box>
+      </TabPanel>
+      
+      {/* Feedback Tab */}
+      <TabPanel value={activeTab} index={2}>
+        <Paper elevation={2} sx={{ p: 3, borderRadius: 2 }}>
+          <Typography variant="h6" gutterBottom>
+            Overall Feedback
+          </Typography>
+          <Typography variant="body1" paragraph>
+            {submission.feedback?.overallFeedback || 'No feedback provided.'}
+          </Typography>
+          
+          <Divider sx={{ my: 3 }} />
+          
+          <Typography variant="h6" gutterBottom>
+            Strengths
+          </Typography>
+          <List>
+            {scorePercentage >= 80 && (
+              <ListItem>
+                <ListItemIcon>
+                  <CheckCircleIcon color="success" />
+                </ListItemIcon>
+                <ListItemText primary="Strong overall understanding of the material" />
+              </ListItem>
+            )}
+            {/* You would generate these dynamically based on the submission */}
+            <ListItem>
+              <ListItemIcon>
+                <CheckCircleIcon color="success" />
+              </ListItemIcon>
+              <ListItemText primary="Good grasp of fundamental concepts" />
+            </ListItem>
+          </List>
+          
+          <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
+            Areas for Improvement
+          </Typography>
+          <List>
+            {scorePercentage < 80 && (
+              <ListItem>
+                <ListItemIcon>
+                  <FlagIcon color="warning" />
+                </ListItemIcon>
+                <ListItemText primary="Review the course materials to strengthen your understanding" />
+              </ListItem>
+            )}
+            {/* You would generate these dynamically based on the submission */}
+            <ListItem>
+              <ListItemIcon>
+                <FlagIcon color="warning" />
+              </ListItemIcon>
+              <ListItemText primary="Practice more complex problem-solving scenarios" />
+            </ListItem>
+          </List>
+          
+          <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
+            Next Steps
+          </Typography>
+          <Alert severity="info" sx={{ mt: 1 }}>
+            <Typography variant="body1">
+              Based on your performance, we recommend focusing on the following topics:
+            </Typography>
+            <List dense>
+              <ListItem>
+                <ListItemIcon>
+                  <TimelineIcon color="primary" />
+                </ListItemIcon>
+                <ListItemText primary="Review Tree traversal algorithms" />
+              </ListItem>
+              <ListItem>
+                <ListItemIcon>
+                  <TimelineIcon color="primary" />
+                </ListItemIcon>
+                <ListItemText primary="Practice time complexity analysis" />
+              </ListItem>
+            </List>
+          </Alert>
+        </Paper>
+      </TabPanel>
     </Container>
   );
 };

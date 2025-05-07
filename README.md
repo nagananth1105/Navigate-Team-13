@@ -2,7 +2,7 @@
 
 ## Overview
 
-Navigate is a comprehensive adaptive learning platform designed to enhance the educational experience for both instructors and students. The platform leverages AI technology to provide personalized learning paths, automated assessment generation, syllabus analysis, and plagiarism detection.
+Navigate is a comprehensive adaptive learning platform designed to enhance the educational experience for both instructors and students. The platform leverages AI technology to revolutionize education with personalized learning paths, intelligent assessments, and data-driven insights.
 
 ## Features
 

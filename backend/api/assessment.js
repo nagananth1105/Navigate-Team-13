@@ -385,4 +385,305 @@ router.get('/templates/:courseId', authMiddleware, async (req, res) => {
   }
 });
 
+// @route   POST /api/assessment/save
+// @desc    Save assessment to database and optionally assign to students
+// @access  Private (Instructor only)
+router.post('/save', authMiddleware, async (req, res) => {
+  try {
+    const { 
+      title, 
+      description, 
+      courseId, 
+      questions, 
+      timeLimit, 
+      totalPoints,
+      assignToAllStudents,
+      syllabusTitle,
+      visibility
+    } = req.body;
+    
+    // Check if user is an instructor
+    if (req.user.role !== 'instructor') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only instructors can save assessments'
+      });
+    }
+    
+    if (!title || !courseId || !questions || !Array.isArray(questions)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required assessment information'
+      });
+    }
+    
+    // Create assessment document
+    const assessment = {
+      title,
+      description,
+      courseId,
+      questions,
+      timeLimit: timeLimit || 60,
+      totalPoints: totalPoints || questions.reduce((sum, q) => sum + (q.points || 0), 0),
+      createdBy: req.user.id,
+      createdAt: new Date(),
+      assignToAllStudents: assignToAllStudents || false,
+      syllabusTitle: syllabusTitle || '',
+      visibility: visibility || {
+        instructorCanSeeAnswers: true,
+        studentsCanSeeAnswers: false,
+        studentsCanSeeSyllabusTitle: false
+      }
+    };
+    
+    // In a real implementation, you would save to the database
+    // For now, we'll simulate a successful save
+    
+    // If assignToAllStudents is true, we would also create assignments for all students in the course
+    const assignmentStatus = assessment.assignToAllStudents 
+      ? 'Assessment assigned to all students in the course' 
+      : 'Assessment saved as draft';
+    
+    res.status(200).json({
+      success: true,
+      message: `Assessment saved successfully. ${assignmentStatus}`,
+      assessmentId: '12345', // This would be the actual ID from the database
+      assessment
+    });
+  } catch (error) {
+    console.error('Error saving assessment:', error);
+    res.status(500).json({
+      success: false,
+      message: `Error saving assessment: ${error.message}`
+    });
+  }
+});
+
+// @route   GET /api/assessment/student/:assessmentId
+// @desc    Get assessment for student (filtered to hide instructor-only content)
+// @access  Private (Student only)
+router.get('/student/:assessmentId', authMiddleware, async (req, res) => {
+  try {
+    const { assessmentId } = req.params;
+    
+    // In a real implementation, you would fetch from database
+    // For now, we'll use a mock assessment
+    
+    // Create a filtered version that only shows what students should see
+    // based on the visibility settings
+    const assessment = {
+      id: assessmentId,
+      title: 'Midterm Exam',
+      description: 'Test your knowledge on basic data structures',
+      courseId: '1',
+      courseName: 'Data Structures and Algorithms',
+      timeLimit: 60,
+      totalPoints: 100,
+      dueDate: '2025-12-10',
+      // Filter out answers and other instructor-only information
+      questions: [
+        {
+          id: '1',
+          text: 'Which data structure uses LIFO (Last In First Out) principle?',
+          type: 'multiple-choice',
+          options: ['Queue', 'Stack', 'Linked List', 'Tree'],
+          points: 5
+          // Note: correctAnswer is omitted for students
+        },
+        // More questions...
+      ]
+    };
+    
+    res.status(200).json({
+      success: true,
+      assessment
+    });
+  } catch (error) {
+    console.error('Error retrieving assessment for student:', error);
+    res.status(500).json({
+      success: false,
+      message: `Error retrieving assessment: ${error.message}`
+    });
+  }
+});
+
+// @route   POST /api/assessment/submit
+// @desc    Submit a completed assessment
+// @access  Private (Student only)
+router.post('/submit', authMiddleware, async (req, res) => {
+  try {
+    const { 
+      assessmentId, 
+      answers, 
+      timeSpent 
+    } = req.body;
+    
+    if (!assessmentId || !answers || typeof answers !== 'object') {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required submission information'
+      });
+    }
+    
+    // In a real implementation, you would:
+    // 1. Validate the assessmentId exists and is available to the student
+    // 2. Calculate the score based on answers
+    // 3. Save the submission to the database
+    // 4. Update the student's progress
+    
+    // For now, simulate a successful submission
+    const submission = {
+      id: Math.random().toString(36).substring(2, 10),
+      assessmentId,
+      studentId: req.user.id,
+      answers,
+      timeSpent: timeSpent || 0,
+      score: 85, // This would be calculated
+      maxScore: 100,
+      submittedAt: new Date()
+    };
+    
+    res.status(200).json({
+      success: true,
+      message: 'Assessment submitted successfully',
+      submissionId: submission.id,
+      score: submission.score,
+      maxScore: submission.maxScore
+    });
+  } catch (error) {
+    console.error('Error submitting assessment:', error);
+    res.status(500).json({
+      success: false,
+      message: `Error submitting assessment: ${error.message}`
+    });
+  }
+});
+
+// @route   GET /api/assessment/results/:submissionId
+// @desc    Get assessment submission results
+// @access  Private (Owner student or instructor)
+router.get('/results/:submissionId', authMiddleware, async (req, res) => {
+  try {
+    const { submissionId } = req.params;
+    
+    // In a real implementation, you would fetch from database
+    // and apply appropriate visibility rules based on user role
+    
+    // Assume we found the submission
+    const submission = {
+      id: submissionId,
+      assessmentId: '1',
+      assessment: {
+        title: 'Midterm Exam',
+        courseId: '1',
+        courseName: 'Data Structures and Algorithms'
+      },
+      studentId: '123',
+      studentName: 'Student Name',
+      score: 85,
+      maxScore: 100,
+      submittedAt: new Date().toISOString(),
+      timeSpent: 45,
+      answers: {
+        // Student answers here
+      },
+      questionResults: [
+        {
+          questionId: '1',
+          correct: true,
+          score: 5,
+          maxScore: 5,
+          feedback: 'Great job!'
+        },
+        // More question results...
+      ]
+    };
+    
+    // Check if user is authorized to view this submission
+    // (either the student who submitted it or an instructor of the course)
+    const isOwner = req.user.id === submission.studentId;
+    const isInstructor = req.user.role === 'instructor';
+    
+    if (!isOwner && !isInstructor) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to view this submission'
+      });
+    }
+    
+    // Apply visibility rules based on user role
+    let visibleSubmission = { ...submission };
+    
+    // If student, maybe hide certain information
+    if (!isInstructor) {
+      // In the real implementation, this would depend on assessment settings
+      // For example, maybe don't show correct answers immediately
+    }
+    
+    res.status(200).json({
+      success: true,
+      submission: visibleSubmission
+    });
+  } catch (error) {
+    console.error('Error retrieving submission results:', error);
+    res.status(500).json({
+      success: false,
+      message: `Error retrieving results: ${error.message}`
+    });
+  }
+});
+
+// @route   GET /api/assessment/course/:courseId/submissions
+// @desc    Get all submissions for a course
+// @access  Private (Instructor only)
+router.get('/course/:courseId/submissions', authMiddleware, async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    
+    // Check if user is an instructor
+    if (req.user.role !== 'instructor') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only instructors can view all course submissions'
+      });
+    }
+    
+    // In a real implementation, you would fetch from database
+    // For now, return mock data
+    const submissions = [
+      {
+        id: '1',
+        assessmentId: '1',
+        assessmentTitle: 'Midterm Exam',
+        studentId: '123',
+        studentName: 'John Doe',
+        score: 85,
+        maxScore: 100,
+        submittedAt: new Date().toISOString()
+      },
+      {
+        id: '2',
+        assessmentId: '1',
+        assessmentTitle: 'Midterm Exam',
+        studentId: '456',
+        studentName: 'Jane Smith',
+        score: 92,
+        maxScore: 100,
+        submittedAt: new Date().toISOString()
+      }
+    ];
+    
+    res.status(200).json({
+      success: true,
+      submissions
+    });
+  } catch (error) {
+    console.error('Error retrieving course submissions:', error);
+    res.status(500).json({
+      success: false,
+      message: `Error retrieving submissions: ${error.message}`
+    });
+  }
+});
+
 module.exports = router;

@@ -6,6 +6,7 @@ import axios from 'axios'; // Import axios instead of using fetch
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext'; // Import useAuth hook
 import AssessmentPatternSelector from './AssessmentPatternSelector';
+import { useNavigate } from 'react-router-dom'; // Import useNavigate hook
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
@@ -64,6 +65,7 @@ const SyllabusUpload = () => {
   const [selectedTopics, setSelectedTopics] = useState([]);
   const [topicDialogOpen, setTopicDialogOpen] = useState(false);
   const { currentUser, token } = useAuth(); // Get auth context
+  const navigate = useNavigate(); // Initialize navigate hook
 
   const patternSectionRef = useRef(null);
 
@@ -602,15 +604,166 @@ const SyllabusUpload = () => {
     </Box>
   );
 
-  const renderSettingsAndReviewStep = () => (
+  return (
+    <Box>
+      <Stepper activeStep={activeStep} alternativeLabel>
+        {steps.map((label, index) => (
+          <Step key={index}>
+            <StepLabel>{label}</StepLabel>
+          </Step>
+        ))}
+      </Stepper>
+
+      <Box mt={3}>
+        {activeStep === 0 && renderUploadSyllabusStep()}
+        {activeStep === 1 && renderPatternSelectionStep()}
+        {activeStep === 2 && renderQuestionsCustomizationStep()}
+        {activeStep === 3 && (
+          <SettingsAndReviewStep 
+            generatedAssessment={generatedAssessment}
+            syllabusAnalysis={syllabusAnalysis}
+            loading={loading}
+            setLoading={setLoading}
+            success={success}
+            setSuccess={setSuccess}
+            navigate={navigate}
+            setActiveStep={setActiveStep}
+          />
+        )}
+      </Box>
+    </Box>
+  );
+};
+
+const SettingsAndReviewStep = ({ 
+  generatedAssessment, 
+  syllabusAnalysis, 
+  loading, 
+  setLoading, 
+  success, 
+  setSuccess, 
+  navigate, 
+  setActiveStep 
+}) => {
+  const [courseId, setCourseId] = useState('');
+  const [assignToAll, setAssignToAll] = useState(true);
+  const [formError, setFormError] = useState(null);
+  
+  const handleSaveAssessment = async () => {
+    try {
+      setFormError(null);
+      setLoading(true);
+      
+      if (!generatedAssessment) {
+        throw new Error('Please generate an assessment first');
+      }
+      
+      if (!courseId) {
+        setFormError('Please select a course');
+        setLoading(false);
+        return;
+      }
+      
+      // Prepare assessment data
+      const assessmentData = {
+        id: `assessment-${Date.now()}`,
+        title: generatedAssessment.title,
+        description: generatedAssessment.description || 'Assessment generated from syllabus analysis',
+        courseId: courseId,
+        questions: generatedAssessment.questions,
+        timeLimit: generatedAssessment.timeLimit || 60,
+        totalPoints: generatedAssessment.totalPoints || generatedAssessment.questions.reduce((sum, q) => sum + (q.points || 0), 0),
+        assignToAllStudents: assignToAll,
+        syllabusTitle: syllabusAnalysis.title || 'Generated Assessment',
+        visibility: {
+          instructorCanSeeAnswers: true,
+          studentsCanSeeAnswers: false,
+          studentsCanSeeSyllabusTitle: false,
+          showResultsImmediately: true
+        },
+        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // Set due date 1 week in the future
+        createdAt: new Date().toISOString()
+      };
+      
+      try {
+        // Try to save to API
+        const response = await api.post('/assessment/save', assessmentData);
+        console.log("API response:", response.data);
+      } catch (apiError) {
+        console.warn("API save failed, using localStorage instead:", apiError);
+      }
+      
+      // Even if API fails, save to localStorage as fallback
+      try {
+        // Get existing saved assessments from localStorage
+        const savedAssessmentsString = localStorage.getItem('savedAssessments');
+        let savedAssessments = [];
+        if (savedAssessmentsString) {
+          savedAssessments = JSON.parse(savedAssessmentsString);
+        }
+        
+        // Add the new assessment
+        savedAssessments.push(assessmentData);
+        
+        // Save back to localStorage
+        localStorage.setItem('savedAssessments', JSON.stringify(savedAssessments));
+        console.log("Assessment saved to localStorage:", assessmentData);
+      } catch (storageError) {
+        console.error("Error saving to localStorage:", storageError);
+      }
+      
+      // Show success message
+      setSuccess(`Assessment saved successfully. ${assignToAll ? 'Assessment has been assigned to all students in the course.' : 'Assessment saved as draft.'}`);
+      
+      // Reset the form or navigate to the course page
+      setTimeout(() => {
+        navigate(`/instructor/courses/${courseId}`);
+      }, 2000);
+    } catch (err) {
+      console.error('Error saving assessment:', err);
+      setFormError(err.message || 'Error saving assessment');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
     <Box>
       <Typography variant="h6" gutterBottom>
-        Assessment Settings and Review
+        Settings & Review
       </Typography>
 
-      <Alert severity="info" sx={{ mb: 3 }}>
-        Your assessment is ready for deployment. Review the settings below and make any final adjustments.
-      </Alert>
+      {formError && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {formError}
+        </Alert>
+      )}
+
+      {success && (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          {success}
+        </Alert>
+      )}
+
+      <Box mb={3}>
+        <TextField
+          label="Course ID"
+          fullWidth
+          value={courseId}
+          onChange={(e) => setCourseId(e.target.value)}
+          variant="outlined"
+          sx={{ mb: 2 }}
+        />
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={assignToAll}
+              onChange={(e) => setAssignToAll(e.target.checked)}
+            />
+          }
+          label="Assign to all students in the course"
+        />
+      </Box>
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
         <Button
@@ -623,51 +776,19 @@ const SyllabusUpload = () => {
         <Button
           variant="contained"
           color="primary"
-          onClick={() => {
-            setSuccess('Assessment saved successfully!');
-          }}
+          onClick={handleSaveAssessment}
+          disabled={loading}
         >
-          Save Assessment
+          {loading ? (
+            <>
+              <CircularProgress size={24} sx={{ mr: 1 }} />
+              Saving...
+            </>
+          ) : (
+            'Save Assessment'
+          )}
         </Button>
       </Box>
-    </Box>
-  );
-
-  return (
-    <Box sx={{ maxWidth: 1200, mx: 'auto' }}>
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h5" gutterBottom>
-          <AssignmentIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
-          Assessment Creation
-        </Typography>
-        <Typography variant="body2" color="text.secondary" paragraph>
-          Upload a syllabus, select an assessment pattern, and generate questions with AI.
-        </Typography>
-
-        <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-          {steps.map((label) => (
-            <Step key={label}>
-              <StepLabel>{label}</StepLabel>
-            </Step>
-          ))}
-        </Stepper>
-
-        {error && activeStep === 0 && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
-        {!apiAccessible && (
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            API connection is not available. Some features may not work correctly.
-          </Alert>
-        )}
-
-        {activeStep === 0 && renderUploadSyllabusStep()}
-        {activeStep === 1 && renderPatternSelectionStep()}
-        {activeStep === 2 && renderQuestionsCustomizationStep()}
-        {activeStep === 3 && renderSettingsAndReviewStep()}
-      </Paper>
     </Box>
   );
 };

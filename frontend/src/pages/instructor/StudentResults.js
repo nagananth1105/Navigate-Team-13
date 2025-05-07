@@ -1,41 +1,412 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
-  Box,
-  Container,
-  Typography,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TableSortLabel,
-  TablePagination,
-  Chip,
-  Button,
-  IconButton,
-  Grid,
-  Card,
-  CardContent,
-  CircularProgress,
-  TextField,
-  MenuItem,
-  InputAdornment,
-  Divider,
-  Tabs,
-  Tab,
-  Tooltip
+  Box, Container, Typography, Paper, Grid, Button, Card, CardContent,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Tabs, Tab, Chip, CircularProgress, Alert, Divider
 } from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
-import FilterListIcon from '@mui/icons-material/FilterList';
-import DownloadIcon from '@mui/icons-material/Download';
-import AssessmentIcon from '@mui/icons-material/Assessment';
-import PersonIcon from '@mui/icons-material/Person';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import TrendingDownIcon from '@mui/icons-material/TrendingDown';
-import TrendingFlatIcon from '@mui/icons-material/TrendingFlat';
+import { 
+  ArrowBack as ArrowBackIcon,
+  Assessment as AssessmentIcon,
+  Person as PersonIcon,
+  TrendingUp as TrendingUpIcon,
+  Description as DescriptionIcon
+} from '@mui/icons-material';
+import { useAuth } from '../../contexts/AuthContext';
+
+// Mock data moved to a separate constant at the bottom for clarity
+
+function TabPanel(props) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`student-results-tabpanel-${index}`}
+      aria-labelledby={`student-results-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ pt: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
+
+const StudentResults = () => {
+  const { courseId } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { currentUser } = useAuth();
+  const isInstructor = currentUser?.role === 'instructor';
+  
+  const [loading, setLoading] = useState(true);
+  const [results, setResults] = useState([]);
+  const [statistics, setStatistics] = useState(null);
+  const [assessments, setAssessments] = useState([]);
+  const [selectedStudentId, setSelectedStudentId] = useState(null);
+  const [selectedAssessmentId, setSelectedAssessmentId] = useState(null);
+  const [studentDetail, setStudentDetail] = useState(null);
+  
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [order, setOrder] = useState('desc');
+  const [orderBy, setOrderBy] = useState('score');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedAssessment, setSelectedAssessment] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('all');
+  const [tabValue, setTabValue] = useState(0);
+  
+  useEffect(() => {
+    // Parse query parameters
+    const queryParams = new URLSearchParams(location.search);
+    const assessmentId = queryParams.get('assessment');
+    if (assessmentId) {
+      setSelectedAssessment(assessmentId);
+    }
+    
+    // In a real app, you would fetch this data from your API
+    const timer = setTimeout(() => {
+      setResults(mockStudentResults);
+      setStatistics(mockStatistics);
+      setAssessments(mockAssessments);
+      setLoading(false);
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, [courseId, location.search]);
+  
+  const handleRequestSort = (property) => {
+    const isAsc = orderBy === property && order === 'asc';
+    setOrder(isAsc ? 'desc' : 'asc');
+    setOrderBy(property);
+  };
+  
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+  
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+  
+  const handleTabChange = (event, newValue) => {
+    setTabValue(newValue);
+  };
+  
+  const handleSearchChange = (event) => {
+    setSearchTerm(event.target.value);
+    setPage(0);
+  };
+  
+  const handleFilterChange = (type, value) => {
+    if (type === 'assessment') {
+      setSelectedAssessment(value);
+    } else if (type === 'status') {
+      setSelectedStatus(value);
+    }
+    setPage(0);
+  };
+
+  const handleStudentSelect = (studentId) => {
+    setSelectedStudentId(studentId);
+    
+    // Fetch student details - in a real app, this would be an API call
+    const student = mockStudentResults.find(s => s.id === studentId);
+    if (student) {
+      setStudentDetail(student);
+    }
+  };
+  
+  const filteredResults = results
+    .filter(result => {
+      // Apply assessment filter
+      if (selectedAssessment !== 'all' && result.assessmentTitle !== selectedAssessment) {
+        return false;
+      }
+      
+      // Apply status filter
+      if (selectedStatus !== 'all' && result.status !== selectedStatus) {
+        return false;
+      }
+      
+      // Apply search filter
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        return (
+          result.name.toLowerCase().includes(searchLower) ||
+          result.email.toLowerCase().includes(searchLower) ||
+          result.studentId.toLowerCase().includes(searchLower)
+        );
+      }
+      
+      return true;
+    })
+    .sort((a, b) => {
+      // Apply sorting
+      if (orderBy === 'submissionDate') {
+        return order === 'asc'
+          ? new Date(a.submissionDate) - new Date(b.submissionDate)
+          : new Date(b.submissionDate) - new Date(a.submissionDate);
+      }
+      
+      const aValue = a[orderBy];
+      const bValue = b[orderBy];
+      
+      if (typeof aValue === 'string') {
+        return order === 'asc'
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      }
+      
+      return order === 'asc' ? aValue - bValue : bValue - aValue;
+    })
+    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+    
+  if (loading) {
+    return (
+      <Box 
+        display="flex" 
+        justifyContent="center" 
+        alignItems="center" 
+        minHeight="80vh"
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+  
+  return (
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Box sx={{ mb: 4 }}>
+        <Button 
+          startIcon={<ArrowBackIcon />} 
+          onClick={() => navigate(`/instructor/courses/${courseId}`)} 
+          variant="outlined"
+          sx={{ mb: 2 }}
+        >
+          Back to Course
+        </Button>
+        <Typography variant="h4" component="h1" gutterBottom>
+          Student Assessment Results
+        </Typography>
+        <Typography variant="subtitle1" color="text.secondary">
+          {assessments.find(a => a.id === selectedAssessment)?.title || 'All Assessments'}
+        </Typography>
+      </Box>
+      
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs 
+          value={tabValue} 
+          onChange={handleTabChange} 
+          variant="fullWidth"
+          textColor="primary"
+          indicatorColor="primary"
+        >
+          <Tab icon={<AssessmentIcon />} label="Assessment Results" iconPosition="start" />
+          <Tab icon={<PersonIcon />} label="Student Performance" iconPosition="start" disabled={!selectedStudentId} />
+          <Tab icon={<TrendingUpIcon />} label="Statistics" iconPosition="start" />
+          <Tab icon={<DescriptionIcon />} label="Question Analysis" iconPosition="start" />
+        </Tabs>
+      </Box>
+      
+      {/* Assessment Results Tab */}
+      <TabPanel value={tabValue} index={0}>
+        <Grid container spacing={3}>
+          <Grid item xs={12}>
+            <Paper 
+              elevation={3} 
+              sx={{ p: 3, borderRadius: 2 }}
+            >
+              {/* Filters and Search would go here */}
+              <TableContainer sx={{ mt: 2 }}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Student</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Assessment</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Submission Date</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 'bold' }}>Score</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 'bold' }}>Status</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 'bold' }}>Time Spent</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {filteredResults.map((result) => (
+                      <TableRow 
+                        key={result.id}
+                        hover
+                        onClick={() => handleStudentSelect(result.id)}
+                        sx={{ cursor: 'pointer' }}
+                      >
+                        <TableCell>
+                          <Box>
+                            <Typography variant="body2">
+                              {result.name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {result.studentId}
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                        <TableCell>{result.assessmentTitle}</TableCell>
+                        <TableCell>
+                          {new Date(result.submissionDate).toLocaleString()}
+                        </TableCell>
+                        <TableCell align="right">
+                          <Chip 
+                            label={`${result.score}/${result.maxScore}`} 
+                            color={
+                              result.score / result.maxScore >= 0.9 ? 'success' :
+                              result.score / result.maxScore >= 0.7 ? 'primary' :
+                              result.score / result.maxScore >= 0.6 ? 'warning' : 'error'
+                            }
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell align="right">
+                          <Chip 
+                            label={result.status} 
+                            color={
+                              result.status === 'Completed' ? 'success' :
+                              result.status === 'Needs Review' ? 'warning' : 'default'
+                            }
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell align="right">
+                          {result.timeSpent} min
+                        </TableCell>
+                        <TableCell align="right">
+                          <Button 
+                            size="small" 
+                            color="primary"
+                            variant="outlined"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/results/${result.id}`);
+                            }}
+                          >
+                            View Details
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    
+                    {filteredResults.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={7} align="center">
+                          <Typography color="text.secondary">
+                            No results matching your filters
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              {/* Pagination would go here */}
+            </Paper>
+          </Grid>
+        </Grid>
+      </TabPanel>
+      
+      {/* Student Performance Tab */}
+      <TabPanel value={tabValue} index={1}>
+        {studentDetail ? (
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
+                <Typography variant="h5" gutterBottom>
+                  {studentDetail.name}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  {studentDetail.studentId} • {studentDetail.email}
+                </Typography>
+                <Divider sx={{ my: 2 }} />
+                <Typography variant="h6" gutterBottom>
+                  Performance Summary
+                </Typography>
+                {/* Student performance details would go here */}
+              </Paper>
+            </Grid>
+          </Grid>
+        ) : (
+          <Alert severity="info">
+            Select a student from the results tab to view detailed performance
+          </Alert>
+        )}
+      </TabPanel>
+      
+      {/* Statistics Tab */}
+      <TabPanel value={tabValue} index={2}>
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={6}>
+            <Card elevation={3}>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Score Distribution
+                </Typography>
+                <Box sx={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Typography variant="body1" color="text.secondary">
+                    Score distribution chart would appear here
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <Card elevation={3}>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Assessment Statistics
+                </Typography>
+                {statistics ? (
+                  <Box>
+                    <Typography variant="body1">
+                      Average Score: {statistics.averageScore}%
+                    </Typography>
+                    <Typography variant="body1">
+                      Median Score: {statistics.medianScore}%
+                    </Typography>
+                    <Typography variant="body1">
+                      Highest Score: {statistics.highestScore}%
+                    </Typography>
+                    <Typography variant="body1">
+                      Lowest Score: {statistics.lowestScore}%
+                    </Typography>
+                    <Typography variant="body1">
+                      Standard Deviation: {statistics.standardDeviation}
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Typography variant="body1" color="text.secondary">
+                    No statistics available
+                  </Typography>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      </TabPanel>
+      
+      {/* Question Analysis Tab */}
+      <TabPanel value={tabValue} index={3}>
+        <Alert severity="info" sx={{ mb: 3 }}>
+          This section shows analysis of student performance on individual questions.
+        </Alert>
+        <Typography variant="body1" color="text.secondary" align="center">
+          Question analysis interface would be shown here
+        </Typography>
+      </TabPanel>
+    </Container>
+  );
+};
 
 // Mock data
 const mockStudentResults = [
@@ -86,125 +457,7 @@ const mockStudentResults = [
     attempts: 1,
     timeSpent: 65, // minutes
     improvement: 5
-  },
-  {
-    id: '4',
-    name: 'Noah Brown',
-    email: 'noah.b@example.edu',
-    studentId: 'S1004',
-    assessmentTitle: 'Midterm Exam',
-    courseCode: 'CS301',
-    score: 90,
-    maxScore: 100,
-    submissionDate: '2025-10-12T14:00:00',
-    status: 'Completed',
-    feedbackProvided: false,
-    attempts: 1,
-    timeSpent: 70, // minutes
-    improvement: 0
-  },
-  {
-    id: '5',
-    name: 'Sophia Davis',
-    email: 's.davis@example.edu',
-    studentId: 'S1005',
-    assessmentTitle: 'Midterm Exam',
-    courseCode: 'CS301',
-    score: 88,
-    maxScore: 100,
-    submissionDate: '2025-10-12T13:30:00',
-    status: 'Completed',
-    feedbackProvided: true,
-    attempts: 1,
-    timeSpent: 85, // minutes
-    improvement: 8
-  },
-  {
-    id: '6',
-    name: 'James Garcia',
-    email: 'j.garcia@example.edu',
-    studentId: 'S1006',
-    assessmentTitle: 'Midterm Exam',
-    courseCode: 'CS301',
-    score: 68,
-    maxScore: 100,
-    submissionDate: '2025-10-12T15:50:00',
-    status: 'Needs Review',
-    feedbackProvided: false,
-    attempts: 1,
-    timeSpent: 95, // minutes
-    improvement: -12
-  },
-  {
-    id: '7',
-    name: 'Ava Martinez',
-    email: 'a.martinez@example.edu',
-    studentId: 'S1007',
-    assessmentTitle: 'Midterm Exam',
-    courseCode: 'CS301',
-    score: 75,
-    maxScore: 100,
-    submissionDate: '2025-10-12T14:15:00',
-    status: 'Completed',
-    feedbackProvided: true,
-    attempts: 1,
-    timeSpent: 80, // minutes
-    improvement: 3
-  },
-  {
-    id: '8',
-    name: 'William Lee',
-    email: 'w.lee@example.edu',
-    studentId: 'S1008',
-    assessmentTitle: 'Midterm Exam',
-    courseCode: 'CS301',
-    score: 95,
-    maxScore: 100,
-    submissionDate: '2025-10-12T13:20:00',
-    status: 'Completed',
-    feedbackProvided: true,
-    attempts: 1,
-    timeSpent: 60, // minutes
-    improvement: 15
-  },
-  {
-    id: '9',
-    name: 'Isabella Clark',
-    email: 'i.clark@example.edu',
-    studentId: 'S1009',
-    assessmentTitle: 'Midterm Exam',
-    courseCode: 'CS301',
-    score: 82,
-    maxScore: 100,
-    submissionDate: '2025-10-12T15:40:00',
-    status: 'Completed',
-    feedbackProvided: false,
-    attempts: 1,
-    timeSpent: 75, // minutes
-    improvement: 7
-  },
-  {
-    id: '10',
-    name: 'Mason Chen',
-    email: 'm.chen@example.edu',
-    studentId: 'S1010',
-    assessmentTitle: 'Midterm Exam',
-    courseCode: 'CS301',
-    score: 79,
-    maxScore: 100,
-    submissionDate: '2025-10-12T14:50:00',
-    status: 'Needs Review',
-    feedbackProvided: false,
-    attempts: 1,
-    timeSpent: 88, // minutes
-    improvement: -2
   }
-];
-
-const mockAssessments = [
-  { id: '1', title: 'Midterm Exam', courseCode: 'CS301', type: 'Exam', dueDate: '2025-10-12' },
-  { id: '2', title: 'Programming Assignment 3', courseCode: 'CS101', type: 'Assignment', dueDate: '2025-10-10' },
-  { id: '3', title: 'Frontend Project', courseCode: 'CS240', type: 'Project', dueDate: '2025-10-20' }
 ];
 
 const mockStatistics = {
@@ -219,582 +472,10 @@ const mockStatistics = {
   needsReviewCount: 2
 };
 
-function TabPanel(props) {
-  const { children, value, index, ...other } = props;
-
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`tabpanel-${index}`}
-      aria-labelledby={`tab-${index}`}
-      {...other}
-    >
-      {value === index && (
-        <Box sx={{ py: 3 }}>
-          {children}
-        </Box>
-      )}
-    </div>
-  );
-}
-
-const StudentResults = () => {
-  const { courseId } = useParams();
-  const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [results, setResults] = useState([]);
-  const [statistics, setStatistics] = useState(null);
-  const [assessments, setAssessments] = useState([]);
-  
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [order, setOrder] = useState('desc');
-  const [orderBy, setOrderBy] = useState('score');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedAssessment, setSelectedAssessment] = useState('all');
-  const [selectedStatus, setSelectedStatus] = useState('all');
-  const [tabValue, setTabValue] = useState(0);
-  
-  useEffect(() => {
-    // In a real app, you would fetch this data from your API
-    const timer = setTimeout(() => {
-      setResults(mockStudentResults);
-      setStatistics(mockStatistics);
-      setAssessments(mockAssessments);
-      setLoading(false);
-    }, 1000);
-    
-    return () => clearTimeout(timer);
-  }, [courseId]);
-  
-  const handleRequestSort = (property) => {
-    const isAsc = orderBy === property && order === 'asc';
-    setOrder(isAsc ? 'desc' : 'asc');
-    setOrderBy(property);
-  };
-  
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-  
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-  
-  const handleSearchChange = (event) => {
-    setSearchTerm(event.target.value);
-    setPage(0);
-  };
-  
-  const handleAssessmentFilterChange = (event) => {
-    setSelectedAssessment(event.target.value);
-    setPage(0);
-  };
-  
-  const handleStatusFilterChange = (event) => {
-    setSelectedStatus(event.target.value);
-    setPage(0);
-  };
-  
-  const handleTabChange = (event, newValue) => {
-    setTabValue(newValue);
-  };
-
-  // Filter results based on search and filter options
-  const filteredResults = results.filter(result => {
-    const matchesSearch = 
-      result.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      result.studentId.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesAssessment = 
-      selectedAssessment === 'all' || 
-      result.assessmentTitle === selectedAssessment;
-    
-    const matchesStatus = 
-      selectedStatus === 'all' || 
-      result.status === selectedStatus;
-    
-    return matchesSearch && matchesAssessment && matchesStatus;
-  });
-  
-  // Sort results
-  const sortedResults = filteredResults.sort((a, b) => {
-    let comparison = 0;
-    
-    if (orderBy === 'name') {
-      comparison = a.name.localeCompare(b.name);
-    } else if (orderBy === 'score') {
-      comparison = a.score - b.score;
-    } else if (orderBy === 'submissionDate') {
-      comparison = new Date(a.submissionDate) - new Date(b.submissionDate);
-    } else if (orderBy === 'timeSpent') {
-      comparison = a.timeSpent - b.timeSpent;
-    } else if (orderBy === 'improvement') {
-      comparison = a.improvement - b.improvement;
-    }
-    
-    return order === 'asc' ? comparison : -comparison;
-  });
-  
-  // Paginate results
-  const paginatedResults = sortedResults.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  );
-  
-  if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="80vh">
-        <CircularProgress />
-      </Box>
-    );
-  }
-  
-  return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Student Results
-        </Typography>
-        <Typography variant="subtitle1" color="text.secondary">
-          View and analyze student performance across assessments
-        </Typography>
-      </Box>
-      
-      <Tabs 
-        value={tabValue} 
-        onChange={handleTabChange} 
-        indicatorColor="primary"
-        textColor="primary"
-        variant="fullWidth"
-        sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}
-      >
-        <Tab label="Results Table" />
-        <Tab label="Analytics Dashboard" />
-      </Tabs>
-      
-      <TabPanel value={tabValue} index={0}>
-        {/* Filters and Actions */}
-        <Paper elevation={0} variant="outlined" sx={{ p: 2, mb: 3, borderRadius: 2 }}>
-          <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} sm={6} md={3}>
-              <TextField
-                fullWidth
-                label="Search Students"
-                variant="outlined"
-                size="small"
-                value={searchTerm}
-                onChange={handleSearchChange}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Grid>
-            
-            <Grid item xs={12} sm={6} md={3}>
-              <TextField
-                select
-                fullWidth
-                label="Assessment"
-                variant="outlined"
-                size="small"
-                value={selectedAssessment}
-                onChange={handleAssessmentFilterChange}
-              >
-                <MenuItem value="all">All Assessments</MenuItem>
-                {assessments.map((assessment) => (
-                  <MenuItem key={assessment.id} value={assessment.title}>
-                    {assessment.title}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-            
-            <Grid item xs={12} sm={6} md={3}>
-              <TextField
-                select
-                fullWidth
-                label="Status"
-                variant="outlined"
-                size="small"
-                value={selectedStatus}
-                onChange={handleStatusFilterChange}
-              >
-                <MenuItem value="all">All Statuses</MenuItem>
-                <MenuItem value="Completed">Completed</MenuItem>
-                <MenuItem value="Needs Review">Needs Review</MenuItem>
-              </TextField>
-            </Grid>
-            
-            <Grid item xs={12} sm={6} md={3}>
-              <Button
-                fullWidth
-                variant="outlined"
-                startIcon={<DownloadIcon />}
-              >
-                Export Results
-              </Button>
-            </Grid>
-          </Grid>
-        </Paper>
-        
-        {/* Results Table */}
-        <Paper elevation={3} sx={{ borderRadius: 2, overflow: 'hidden' }}>
-          <TableContainer>
-            <Table sx={{ minWidth: 700 }}>
-              <TableHead>
-                <TableRow>
-                  <TableCell>
-                    <TableSortLabel
-                      active={orderBy === 'name'}
-                      direction={orderBy === 'name' ? order : 'asc'}
-                      onClick={() => handleRequestSort('name')}
-                    >
-                      Student
-                    </TableSortLabel>
-                  </TableCell>
-                  <TableCell>
-                    <TableSortLabel
-                      active={orderBy === 'score'}
-                      direction={orderBy === 'score' ? order : 'asc'}
-                      onClick={() => handleRequestSort('score')}
-                    >
-                      Score
-                    </TableSortLabel>
-                  </TableCell>
-                  <TableCell>
-                    <TableSortLabel
-                      active={orderBy === 'submissionDate'}
-                      direction={orderBy === 'submissionDate' ? order : 'asc'}
-                      onClick={() => handleRequestSort('submissionDate')}
-                    >
-                      Submitted
-                    </TableSortLabel>
-                  </TableCell>
-                  <TableCell>
-                    <TableSortLabel
-                      active={orderBy === 'timeSpent'}
-                      direction={orderBy === 'timeSpent' ? order : 'asc'}
-                      onClick={() => handleRequestSort('timeSpent')}
-                    >
-                      Time Spent
-                    </TableSortLabel>
-                  </TableCell>
-                  <TableCell>
-                    <TableSortLabel
-                      active={orderBy === 'improvement'}
-                      direction={orderBy === 'improvement' ? order : 'asc'}
-                      onClick={() => handleRequestSort('improvement')}
-                    >
-                      Progress
-                    </TableSortLabel>
-                  </TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Feedback</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {paginatedResults.map((result) => (
-                  <TableRow 
-                    key={result.id}
-                    hover
-                    onClick={() => navigate(`/results/${result.id}`)}
-                    sx={{ cursor: 'pointer' }}
-                  >
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Box sx={{ ml: 1 }}>
-                          <Typography variant="body1">{result.name}</Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {result.studentId}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Typography 
-                          variant="body1" 
-                          sx={{ 
-                            fontWeight: 'medium',
-                            color: 
-                              result.score >= 90 ? 'success.main' : 
-                              result.score >= 70 ? 'primary.main' : 
-                              'error.main'
-                          }}
-                        >
-                          {result.score} / {result.maxScore}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(result.submissionDate).toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      {result.timeSpent} min
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        {result.improvement > 0 ? (
-                          <TrendingUpIcon color="success" sx={{ mr: 1 }} />
-                        ) : result.improvement < 0 ? (
-                          <TrendingDownIcon color="error" sx={{ mr: 1 }} />
-                        ) : (
-                          <TrendingFlatIcon color="action" sx={{ mr: 1 }} />
-                        )}
-                        <Typography 
-                          variant="body2"
-                          sx={{ 
-                            color: 
-                              result.improvement > 0 ? 'success.main' : 
-                              result.improvement < 0 ? 'error.main' : 
-                              'text.secondary'
-                          }}
-                        >
-                          {result.improvement > 0 ? '+' : ''}{result.improvement}%
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={result.status} 
-                        size="small"
-                        color={result.status === 'Completed' ? 'success' : 'warning'}
-                        variant={result.status === 'Completed' ? 'filled' : 'outlined'}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      {result.feedbackProvided ? (
-                        <Chip 
-                          label="Provided" 
-                          size="small"
-                          color="info"
-                          variant="outlined"
-                        />
-                      ) : (
-                        <Button size="small" variant="outlined" color="primary">
-                          Add Feedback
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-          
-          <TablePagination
-            rowsPerPageOptions={[5, 10, 25]}
-            component="div"
-            count={filteredResults.length}
-            rowsPerPage={rowsPerPage}
-            page={page}
-            onPageChange={handleChangePage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
-          />
-        </Paper>
-      </TabPanel>
-      
-      <TabPanel value={tabValue} index={1}>
-        {/* Analytics Dashboard */}
-        <Grid container spacing={3}>
-          {/* Statistics Cards */}
-          <Grid item xs={12} md={3}>
-            <Card elevation={2} sx={{ borderRadius: 2 }}>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
-                  Average Score
-                </Typography>
-                <Typography variant="h4" component="div">
-                  {statistics.averageScore.toFixed(1)}%
-                </Typography>
-                <Box sx={{ mt: 2, display: 'flex', alignItems: 'center' }}>
-                  <Box sx={{ position: 'relative', display: 'inline-flex', mr: 2 }}>
-                    <CircularProgress
-                      variant="determinate"
-                      value={statistics.averageScore}
-                      sx={{ color: 
-                        statistics.averageScore >= 85 ? 'success.main' : 
-                        statistics.averageScore >= 70 ? 'primary.main' : 
-                        'error.main' 
-                      }}
-                    />
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    {statistics.averageScore > 80 ? (
-                      <TrendingUpIcon color="success" sx={{ mr: 0.5 }} fontSize="small" />
-                    ) : (
-                      <TrendingFlatIcon color="action" sx={{ mr: 0.5 }} fontSize="small" />
-                    )}
-                    <Typography variant="body2" color="text.secondary">
-                      Class Performance
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-          
-          <Grid item xs={12} md={3}>
-            <Card elevation={2} sx={{ borderRadius: 2 }}>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
-                  Submission Rate
-                </Typography>
-                <Typography variant="h4" component="div">
-                  {statistics.submissionRate}%
-                </Typography>
-                <Box sx={{ mt: 2, display: 'flex', alignItems: 'center' }}>
-                  <Box sx={{ position: 'relative', display: 'inline-flex', mr: 2 }}>
-                    <CircularProgress
-                      variant="determinate"
-                      value={statistics.submissionRate}
-                      sx={{ color: 'info.main' }}
-                    />
-                  </Box>
-                  <Typography variant="body2" color="text.secondary">
-                    {results.length} students
-                  </Typography>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-          
-          <Grid item xs={12} md={3}>
-            <Card elevation={2} sx={{ borderRadius: 2 }}>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
-                  Average Time
-                </Typography>
-                <Typography variant="h4" component="div">
-                  {statistics.averageTimeSpent} min
-                </Typography>
-                <Box sx={{ mt: 2, display: 'flex', alignItems: 'center' }}>
-                  <TrendingFlatIcon color="action" sx={{ mr: 1 }} />
-                  <Typography variant="body2" color="text.secondary">
-                    Per assessment
-                  </Typography>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-          
-          <Grid item xs={12} md={3}>
-            <Card elevation={2} sx={{ borderRadius: 2 }}>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
-                  Needs Review
-                </Typography>
-                <Typography variant="h4" component="div">
-                  {statistics.needsReviewCount}
-                </Typography>
-                <Box sx={{ mt: 2, display: 'flex', alignItems: 'center' }}>
-                  <Button size="small" variant="outlined" color="warning">
-                    Review Now
-                  </Button>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-          
-          {/* Score Distribution */}
-          <Grid item xs={12}>
-            <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
-              <Typography variant="h6" gutterBottom>
-                Score Distribution
-              </Typography>
-              <Box sx={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Typography variant="body1" color="text.secondary">
-                  Score distribution chart would appear here
-                </Typography>
-              </Box>
-            </Paper>
-          </Grid>
-          
-          {/* Performance Metrics */}
-          <Grid item xs={12} md={6}>
-            <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
-              <Typography variant="h6" gutterBottom>
-                Performance Metrics
-              </Typography>
-              <Table size="small">
-                <TableBody>
-                  <TableRow>
-                    <TableCell component="th" scope="row">
-                      Highest Score
-                    </TableCell>
-                    <TableCell align="right">{statistics.highestScore}%</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell component="th" scope="row">
-                      Lowest Score
-                    </TableCell>
-                    <TableCell align="right">{statistics.lowestScore}%</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell component="th" scope="row">
-                      Median Score
-                    </TableCell>
-                    <TableCell align="right">{statistics.medianScore}%</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell component="th" scope="row">
-                      Standard Deviation
-                    </TableCell>
-                    <TableCell align="right">{statistics.standardDeviation.toFixed(1)}</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell component="th" scope="row">
-                      Completion Rate
-                    </TableCell>
-                    <TableCell align="right">{statistics.completionRate}%</TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </Paper>
-          </Grid>
-          
-          {/* Time Analysis */}
-          <Grid item xs={12} md={6}>
-            <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
-              <Typography variant="h6" gutterBottom>
-                Time Analysis
-              </Typography>
-              <Box sx={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Typography variant="body1" color="text.secondary">
-                  Time spent vs. score correlation chart would appear here
-                </Typography>
-              </Box>
-            </Paper>
-          </Grid>
-          
-          {/* Export Actions */}
-          <Grid item xs={12}>
-            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-              <Button 
-                variant="outlined" 
-                startIcon={<DownloadIcon />}
-              >
-                Export CSV
-              </Button>
-              <Button 
-                variant="outlined" 
-                startIcon={<AssessmentIcon />}
-              >
-                Generate Report
-              </Button>
-            </Box>
-          </Grid>
-        </Grid>
-      </TabPanel>
-    </Container>
-  );
-};
+const mockAssessments = [
+  { id: '1', title: 'Midterm Exam', courseCode: 'CS301', type: 'Exam', dueDate: '2025-10-12' },
+  { id: '2', title: 'Programming Assignment 3', courseCode: 'CS101', type: 'Assignment', dueDate: '2025-10-10' },
+  { id: '3', title: 'Frontend Project', courseCode: 'CS240', type: 'Project', dueDate: '2025-10-20' }
+];
 
 export default StudentResults;

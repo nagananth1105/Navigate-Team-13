@@ -1,87 +1,99 @@
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import CheckIcon from '@mui/icons-material/Check';
-import FlagIcon from '@mui/icons-material/Flag';
-import TimerIcon from '@mui/icons-material/Timer';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
-    Box,
-    Button,
-    Card,
-    CardContent,
-    Chip,
-    CircularProgress,
-    Container,
-    Divider,
-    FormControl,
-    FormControlLabel,
-    Grid,
-    LinearProgress,
-    List,
-    ListItem,
-    ListItemText,
-    Paper,
-    Radio,
-    RadioGroup,
-    TextField,
-    Typography
+  Box,
+  Container,
+  Typography,
+  Paper,
+  Button,
+  Stepper,
+  Step,
+  StepLabel,
+  RadioGroup,
+  FormControlLabel,
+  Radio,
+  TextField,
+  Checkbox,
+  FormGroup,
+  Alert,
+  Chip,
+  Card,
+  CardContent,
+  LinearProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  Grid,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  CircularProgress,
+  IconButton,
+  Divider // Added missing Divider import
 } from '@mui/material';
-import React, { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import {
+  ArrowBack as ArrowBackIcon,
+  ArrowForward as ArrowForwardIcon,
+  Flag as FlagIcon,
+  CheckCircle as CheckCircleIcon,
+  AccessTime as AccessTimeIcon,
+  Help as HelpIcon
+} from '@mui/icons-material';
+import { useAuth } from '../../contexts/AuthContext';
 
-// Mock data for development
+// Mock assessment data
 const mockAssessment = {
   id: '1',
-  title: 'Introduction to Data Structures',
-  description: 'Test your knowledge on basic data structures concepts',
+  title: 'Midterm Exam',
+  courseId: '1',
+  courseName: 'Data Structures and Algorithms',
+  description: 'Comprehensive evaluation of your understanding of data structures',
+  dueDate: '2025-10-15T23:59:00',
+  timeLimit: 90, // in minutes
   totalPoints: 100,
-  timeLimit: 60, // minutes
+  randomizeQuestions: true,
+  showAnswers: false,
   questions: [
     {
-      id: '1',
-      question: 'Which data structure operates on a LIFO principle?',
-      questionType: 'Multiple Choice',
+      id: 'q1',
+      text: 'Which data structure uses LIFO (Last In First Out) principle?',
+      type: 'multiple-choice',
       options: ['Queue', 'Stack', 'Linked List', 'Tree'],
-      topic: 'Basic Data Structures',
-      points: 5,
-      difficulty: 'Easy',
-      bloomLevel: 'Knowledge'
+      correctAnswer: 'Stack',
+      points: 5
     },
     {
-      id: '2',
-      question: 'Explain the difference between a linked list and an array in terms of memory allocation.',
-      questionType: 'Short Answer',
-      topic: 'Memory Management',
-      points: 10,
-      difficulty: 'Medium',
-      bloomLevel: 'Comprehension'
-    },
-    {
-      id: '3',
-      question: 'Implement a simple queue using two stacks.',
-      questionType: 'Programming',
-      topic: 'Advanced Data Structures',
-      points: 15,
-      difficulty: 'Hard',
-      bloomLevel: 'Application'
-    },
-    {
-      id: '4',
-      question: 'What is the time complexity of insertion in a balanced binary search tree?',
-      questionType: 'Multiple Choice',
+      id: 'q2',
+      text: 'What is the time complexity of binary search?',
+      type: 'multiple-choice',
       options: ['O(1)', 'O(log n)', 'O(n)', 'O(n log n)'],
-      topic: 'Time Complexity',
-      points: 5,
-      difficulty: 'Medium',
-      bloomLevel: 'Knowledge'
+      correctAnswer: 'O(log n)',
+      points: 5
     },
     {
-      id: '5',
-      question: 'Explain how hash collisions can be resolved in hash tables.',
-      questionType: 'Essay',
-      topic: 'Hash Tables',
-      points: 15,
-      difficulty: 'Medium',
-      bloomLevel: 'Analysis'
+      id: 'q3',
+      text: 'Explain the difference between a stack and a queue.',
+      type: 'short-answer',
+      correctAnswer: 'A stack follows LIFO (Last In First Out) principle where elements are added and removed from the same end, while a queue follows FIFO (First In First Out) principle where elements are added at one end and removed from the other end.',
+      points: 10
+    },
+    {
+      id: 'q4',
+      text: 'Which of the following are valid operations on a binary search tree? (Select all that apply)',
+      type: 'multiple-select',
+      options: ['Insertion', 'Deletion', 'In-order traversal', 'Level order traversal'],
+      correctAnswer: ['Insertion', 'Deletion', 'In-order traversal', 'Level order traversal'],
+      points: 10
+    },
+    {
+      id: 'q5',
+      text: 'True or False: A hash table provides O(1) average time complexity for insertions and lookups.',
+      type: 'true-false',
+      correctAnswer: true,
+      points: 5
     }
   ]
 };
@@ -89,41 +101,68 @@ const mockAssessment = {
 const AssessmentTake = () => {
   const { assessmentId } = useParams();
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
+  
   const [assessment, setAssessment] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState({});
-  const [timeRemaining, setTimeRemaining] = useState(0);
   const [flaggedQuestions, setFlaggedQuestions] = useState([]);
+  const [timeRemaining, setTimeRemaining] = useState(null);
+  const [confirmSubmit, setConfirmSubmit] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [timer, setTimer] = useState(null);
+  const [testStarted, setTestStarted] = useState(false);
   
-  // Load assessment data
   useEffect(() => {
-    // In a real application, you would fetch the assessment from an API
-    // For this demo, we'll use the mock data
-    setAssessment(mockAssessment);
-    setTimeRemaining(mockAssessment.timeLimit * 60); // Convert minutes to seconds
-    setLoading(false);
+    // In a real app, you would fetch the assessment from an API
+    setTimeout(() => {
+      setAssessment(mockAssessment);
+      setLoading(false);
+      
+      if (mockAssessment.timeLimit) {
+        setTimeRemaining(mockAssessment.timeLimit * 60); // Convert to seconds
+      }
+    }, 1000);
+    
+    return () => {
+      if (timer) {
+        clearInterval(timer);
+      }
+    };
   }, [assessmentId]);
   
-  // Timer effect
   useEffect(() => {
-    let timer;
-    if (assessment && timeRemaining > 0) {
-      timer = setInterval(() => {
-        setTimeRemaining(prev => prev - 1);
+    if (testStarted && timeRemaining !== null && timeRemaining > 0) {
+      const interval = setInterval(() => {
+        setTimeRemaining(prev => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            handleSubmitAssessment();
+            return 0;
+          }
+          return prev - 1;
+        });
       }, 1000);
-    } else if (timeRemaining === 0) {
-      handleSubmit();
+      
+      setTimer(interval);
+      
+      return () => clearInterval(interval);
     }
-    
-    return () => clearInterval(timer);
-  }, [assessment, timeRemaining, handleSubmit]);
+  }, [testStarted, timeRemaining]);
   
-  // Format time remaining as mm:ss
+  const startTest = () => {
+    setTestStarted(true);
+  };
+  
+  // Format the remaining time
   const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    
+    return `${hours > 0 ? `${hours}h ` : ''}${minutes}m ${secs}s`;
   };
   
   // Calculate progress percentage
@@ -166,89 +205,159 @@ const AssessmentTake = () => {
     }
   };
   
-  // Submit assessment
-  const handleSubmit = useCallback(() => {
-    // In a real app, you would submit the answers to the server
-    console.log('Submitting answers:', answers);
-    
-    // Navigate to results page with a mock submission ID
-    navigate('/results/123');
-  }, [answers, navigate]);
+  // Open confirmation dialog
+  const handleOpenSubmitDialog = () => {
+    setConfirmSubmit(true);
+  };
   
-  // Render question based on its type
-  const renderQuestion = (question) => {
-    switch (question.questionType) {
-      case 'Multiple Choice':
-        return (
-          <FormControl component="fieldset" fullWidth>
-            <RadioGroup
-              value={answers[question.id] || ''}
-              onChange={(e) => handleAnswerChange(e.target.value)}
-            >
-              {question.options.map((option, index) => (
-                <FormControlLabel 
-                  key={index} 
-                  value={option} 
-                  control={<Radio />} 
-                  label={option} 
-                />
-              ))}
-            </RadioGroup>
-          </FormControl>
-        );
+  // Close confirmation dialog
+  const handleCloseSubmitDialog = () => {
+    setConfirmSubmit(false);
+  };
+  
+  // Handle assessment submission
+  const handleSubmitAssessment = async () => {
+    setSubmitting(true);
+    
+    // In a real app, you would submit the assessment to your API
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Calculate score (this would be done on the server in a real app)
+      let score = 0;
+      let maxScore = 0;
+      
+      assessment.questions.forEach(question => {
+        maxScore += question.points;
+        const userAnswer = answers[question.id];
         
-      case 'Short Answer':
-      case 'Essay':
-        return (
-          <TextField
-            multiline
-            rows={question.questionType === 'Essay' ? 8 : 3}
-            placeholder="Enter your answer here..."
-            variant="outlined"
-            fullWidth
-            value={answers[question.id] || ''}
-            onChange={(e) => handleAnswerChange(e.target.value)}
-          />
-        );
+        if (!userAnswer) return; // Unanswered
         
-      case 'Programming':
-        return (
-          <TextField
-            multiline
-            rows={10}
-            placeholder="Enter your code here..."
-            variant="outlined"
-            fullWidth
-            value={answers[question.id] || ''}
-            onChange={(e) => handleAnswerChange(e.target.value)}
-            InputProps={{
-              style: { fontFamily: 'monospace' }
-            }}
-          />
-        );
-        
-      default:
-        return (
-          <TextField
-            multiline
-            rows={4}
-            placeholder="Enter your answer here..."
-            variant="outlined"
-            fullWidth
-            value={answers[question.id] || ''}
-            onChange={(e) => handleAnswerChange(e.target.value)}
-          />
-        );
+        if (question.type === 'multiple-choice' || question.type === 'true-false') {
+          if (userAnswer === question.correctAnswer) {
+            score += question.points;
+          }
+        } else if (question.type === 'multiple-select') {
+          if (userAnswer.length === question.correctAnswer.length && 
+              userAnswer.every(a => question.correctAnswer.includes(a))) {
+            score += question.points;
+          }
+        } else if (question.type === 'short-answer') {
+          // In a real app, this would be graded by AI or an instructor
+          // For now, we'll give partial credit based on answer length
+          if (userAnswer.length > 10) {
+            score += question.points * 0.8;
+          }
+        }
+      });
+      
+      // Navigate to results page
+      navigate(`/results/${assessmentId}`, { 
+        state: { 
+          score,
+          maxScore,
+          answers,
+          assessment
+        }
+      });
+    } catch (error) {
+      setError('Failed to submit assessment. Please try again.');
+      setSubmitting(false);
     }
   };
   
+  // Render the current question
+  const renderQuestion = () => {
+    const question = assessment.questions[currentQuestionIndex];
+    
+    switch (question.type) {
+      case 'multiple-choice':
+        return (
+          <RadioGroup
+            value={answers[question.id] || ''}
+            onChange={(e) => handleAnswerChange(e.target.value)}
+          >
+            {question.options.map((option, index) => (
+              <FormControlLabel
+                key={index}
+                value={option}
+                control={<Radio />}
+                label={option}
+              />
+            ))}
+          </RadioGroup>
+        );
+        
+      case 'true-false':
+        return (
+          <RadioGroup
+            value={answers[question.id]?.toString() || ''}
+            onChange={(e) => handleAnswerChange(e.target.value === 'true')}
+          >
+            <FormControlLabel
+              value="true"
+              control={<Radio />}
+              label="True"
+            />
+            <FormControlLabel
+              value="false"
+              control={<Radio />}
+              label="False"
+            />
+          </RadioGroup>
+        );
+        
+      case 'short-answer':
+        return (
+          <TextField
+            fullWidth
+            multiline
+            rows={4}
+            variant="outlined"
+            placeholder="Enter your answer here..."
+            value={answers[question.id] || ''}
+            onChange={(e) => handleAnswerChange(e.target.value)}
+          />
+        );
+        
+      case 'multiple-select':
+        return (
+          <FormGroup>
+            {question.options.map((option, index) => (
+              <FormControlLabel
+                key={index}
+                control={
+                  <Checkbox
+                    checked={(answers[question.id] || []).includes(option)}
+                    onChange={(e) => {
+                      const currentSelections = answers[question.id] || [];
+                      if (e.target.checked) {
+                        handleAnswerChange([...currentSelections, option]);
+                      } else {
+                        handleAnswerChange(currentSelections.filter(item => item !== option));
+                      }
+                    }}
+                  />
+                }
+                label={option}
+              />
+            ))}
+          </FormGroup>
+        );
+        
+      default:
+        return <Alert severity="error">Unsupported question type</Alert>;
+    }
+  };
+
   if (loading) {
     return (
       <Box 
         display="flex" 
         justifyContent="center" 
         alignItems="center" 
-        minHeight="100vh"
+        minHeight="80vh"
       >
         <CircularProgress />
       </Box>
@@ -258,12 +367,12 @@ const AssessmentTake = () => {
   if (!assessment) {
     return (
       <Container maxWidth="md" sx={{ mt: 4 }}>
-        <Typography variant="h5" color="error">
-          Assessment not found
-        </Typography>
+        <Alert severity="error">
+          Assessment not found or no longer available.
+        </Alert>
         <Button 
           variant="contained" 
-          onClick={() => navigate('/dashboard')}
+          onClick={() => navigate('/dashboard')} 
           sx={{ mt: 2 }}
         >
           Back to Dashboard
@@ -272,68 +381,153 @@ const AssessmentTake = () => {
     );
   }
   
-  const currentQuestion = assessment.questions[currentQuestionIndex];
-  const isFlagged = flaggedQuestions.includes(currentQuestion.id);
+  if (!testStarted) {
+    return (
+      <Container maxWidth="md" sx={{ mt: 4 }}>
+        <Paper elevation={3} sx={{ p: 4, borderRadius: 2 }}>
+          <Typography variant="h4" gutterBottom>
+            {assessment.title}
+          </Typography>
+          <Typography variant="subtitle1" color="text.secondary" gutterBottom>
+            {assessment.courseName}
+          </Typography>
+          <Divider sx={{ my: 2 }} />
+          
+          <Grid container spacing={3} sx={{ mb: 3 }}>
+            <Grid item xs={12} sm={6}>
+              <List dense>
+                <ListItem>
+                  <ListItemIcon>
+                    <CheckCircleIcon />
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary="Total Points" 
+                    secondary={assessment.totalPoints} 
+                  />
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <AccessTimeIcon />
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary="Time Limit" 
+                    secondary={assessment.timeLimit ? `${assessment.timeLimit} minutes` : 'No time limit'} 
+                  />
+                </ListItem>
+              </List>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <List dense>
+                <ListItem>
+                  <ListItemIcon>
+                    <HelpIcon />
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary="Questions" 
+                    secondary={assessment.questions.length} 
+                  />
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <CalendarIcon />
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary="Due Date" 
+                    secondary={new Date(assessment.dueDate).toLocaleString()} 
+                  />
+                </ListItem>
+              </List>
+            </Grid>
+          </Grid>
+          
+          <Alert severity="info" sx={{ mb: 3 }}>
+            {assessment.timeLimit 
+              ? `This assessment has a time limit of ${assessment.timeLimit} minutes. The timer will start once you begin.` 
+              : 'This assessment has no time limit, but must be completed in one session.'}
+          </Alert>
+          
+          <Typography variant="body1" paragraph>
+            {assessment.description}
+          </Typography>
+          
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
+            <Button 
+              variant="outlined" 
+              onClick={() => navigate(-1)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="contained" 
+              color="primary" 
+              onClick={startTest}
+            >
+              Begin Assessment
+            </Button>
+          </Box>
+        </Paper>
+      </Container>
+    );
+  }
   
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Grid container spacing={3}>
-        {/* Left Column (Question Area) */}
-        <Grid item xs={12} md={8}>
-          <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h5" component="h1">
-                {assessment.title}
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <TimerIcon sx={{ mr: 1, color: timeRemaining < 300 ? 'error.main' : 'inherit' }} />
-                <Typography 
-                  variant="h6" 
-                  color={timeRemaining < 300 ? 'error' : 'inherit'}
-                >
-                  {formatTime(timeRemaining)}
-                </Typography>
-              </Box>
-            </Box>
-            
-            <LinearProgress 
-              variant="determinate" 
-              value={progressPercentage()} 
-              sx={{ mb: 3 }} 
+      <Paper elevation={3} sx={{ p: 3, mb: 2, borderRadius: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h5">
+            {assessment.title}
+          </Typography>
+          {timeRemaining !== null && (
+            <Chip 
+              icon={<AccessTimeIcon />} 
+              label={`Time remaining: ${formatTime(timeRemaining)}`}
+              color={timeRemaining < 300 ? 'error' : 'default'}
+              variant="outlined"
             />
-            
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-              <Chip 
-                label={`Question ${currentQuestionIndex + 1} of ${assessment.questions.length}`} 
-                color="primary" 
-                variant="outlined" 
+          )}
+        </Box>
+      </Paper>
+      
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={8}>
+          <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                Question {currentQuestionIndex + 1} of {assessment.questions.length}
+              </Typography>
+              <LinearProgress 
+                variant="determinate" 
+                value={progressPercentage()} 
+                sx={{ mb: 2 }}
               />
-              <Box>
-                <Chip 
-                  label={`${currentQuestion.points} points`} 
-                  variant="outlined" 
-                  sx={{ mr: 1 }} 
-                />
-                <Chip 
-                  label={currentQuestion.difficulty} 
-                  color={
-                    currentQuestion.difficulty === 'Easy' ? 'success' : 
-                    currentQuestion.difficulty === 'Medium' ? 'warning' : 'error'
-                  }
-                  variant="outlined" 
-                />
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="body2" color="text.secondary">
+                  {Math.round(progressPercentage())}% Complete
+                </Typography>
+                <Box>
+                  <IconButton
+                    onClick={toggleFlagged}
+                    color={flaggedQuestions.includes(assessment.questions[currentQuestionIndex].id) ? 'error' : 'default'}
+                    title={flaggedQuestions.includes(assessment.questions[currentQuestionIndex].id) ? 'Unflag question' : 'Flag for review'}
+                  >
+                    <FlagIcon />
+                  </IconButton>
+                </Box>
               </Box>
             </Box>
             
-            <Typography variant="h6" gutterBottom>
-              {currentQuestion.question}
-            </Typography>
+            <Card variant="outlined" sx={{ mb: 3 }}>
+              <CardContent>
+                <Typography variant="body1" sx={{ mb: 2 }}>
+                  {assessment.questions[currentQuestionIndex].text}
+                </Typography>
+                <Box sx={{ mt: 2 }}>
+                  {renderQuestion()}
+                </Box>
+              </CardContent>
+            </Card>
             
-            <Box sx={{ my: 3 }}>
-              {renderQuestion(currentQuestion)}
-            </Box>
-            
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
               <Button
                 variant="outlined"
                 startIcon={<ArrowBackIcon />}
@@ -342,16 +536,6 @@ const AssessmentTake = () => {
               >
                 Previous
               </Button>
-              
-              <Button
-                variant="outlined"
-                color={isFlagged ? 'warning' : 'primary'}
-                startIcon={<FlagIcon />}
-                onClick={toggleFlagged}
-              >
-                {isFlagged ? 'Unflag' : 'Flag for Review'}
-              </Button>
-              
               {currentQuestionIndex < assessment.questions.length - 1 ? (
                 <Button
                   variant="contained"
@@ -363,9 +547,8 @@ const AssessmentTake = () => {
               ) : (
                 <Button
                   variant="contained"
-                  color="success"
-                  endIcon={<CheckIcon />}
-                  onClick={handleSubmit}
+                  color="primary"
+                  onClick={handleOpenSubmitDialog}
                 >
                   Submit Assessment
                 </Button>
@@ -374,102 +557,94 @@ const AssessmentTake = () => {
           </Paper>
         </Grid>
         
-        {/* Right Column (Question List & Info) */}
         <Grid item xs={12} md={4}>
-          <Card elevation={3} sx={{ mb: 3 }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Question Navigator
-              </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-                {assessment.questions.map((q, index) => (
+          <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              Question Navigator
+            </Typography>
+            <Grid container spacing={1} sx={{ mt: 1 }}>
+              {assessment.questions.map((question, index) => (
+                <Grid item key={question.id}>
                   <Button
-                    key={q.id}
                     variant={currentQuestionIndex === index ? 'contained' : 'outlined'}
                     color={
-                      flaggedQuestions.includes(q.id) ? 'warning' : 
-                      answers[q.id] ? 'success' : 'primary'
+                      flaggedQuestions.includes(question.id) ? 'error' :
+                      answers[question.id] ? 'success' : 'primary'
                     }
-                    size="small"
                     onClick={() => setCurrentQuestionIndex(index)}
-                    sx={{ minWidth: '40px' }}
+                    sx={{ minWidth: 40, height: 40, p: 0 }}
                   >
                     {index + 1}
                   </Button>
-                ))}
-              </Box>
-              <Box sx={{ mt: 2 }}>
-                <Typography variant="body2">
-                  <b>Legend:</b>
-                </Typography>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 1 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Box sx={{ width: 16, height: 16, bgcolor: 'primary.main', mr: 1, borderRadius: 1 }} />
-                    <Typography variant="body2">Current</Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Box sx={{ width: 16, height: 16, bgcolor: 'success.main', mr: 1, borderRadius: 1 }} />
-                    <Typography variant="body2">Answered</Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Box sx={{ width: 16, height: 16, bgcolor: 'warning.main', mr: 1, borderRadius: 1 }} />
-                    <Typography variant="body2">Flagged</Typography>
-                  </Box>
+                </Grid>
+              ))}
+            </Grid>
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="body2" gutterBottom>
+                Legend:
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 16, height: 16, borderRadius: 1, bgcolor: 'primary.main' }} />
+                  <Typography variant="body2">Current question</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 16, height: 16, borderRadius: 1, bgcolor: 'success.main' }} />
+                  <Typography variant="body2">Answered</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 16, height: 16, borderRadius: 1, bgcolor: 'error.main' }} />
+                  <Typography variant="body2">Flagged for review</Typography>
                 </Box>
               </Box>
-            </CardContent>
-          </Card>
-          
-          <Card elevation={3}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Assessment Information
-              </Typography>
-              <List dense>
-                <ListItem>
-                  <ListItemText 
-                    primary="Total Questions" 
-                    secondary={assessment.questions.length} 
-                  />
-                </ListItem>
-                <Divider />
-                <ListItem>
-                  <ListItemText 
-                    primary="Total Points" 
-                    secondary={assessment.totalPoints} 
-                  />
-                </ListItem>
-                <Divider />
-                <ListItem>
-                  <ListItemText 
-                    primary="Time Limit" 
-                    secondary={`${assessment.timeLimit} minutes`} 
-                  />
-                </ListItem>
-                <Divider />
-                <ListItem>
-                  <ListItemText 
-                    primary="Completed" 
-                    secondary={`${Object.keys(answers).length} of ${assessment.questions.length} questions`}
-                  />
-                </ListItem>
-              </List>
-              
-              <Button
-                variant="contained"
-                color="success"
-                fullWidth
-                sx={{ mt: 2 }}
-                onClick={handleSubmit}
-              >
-                Submit Assessment
-              </Button>
-            </CardContent>
-          </Card>
+            </Box>
+          </Paper>
         </Grid>
       </Grid>
+      
+      {/* Confirmation Dialog */}
+      <Dialog
+        open={confirmSubmit}
+        onClose={handleCloseSubmitDialog}
+      >
+        <DialogTitle>Submit Assessment?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to submit this assessment? You will not be able to change your answers after submission.
+          </DialogContentText>
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="body2">
+              Total questions: {assessment.questions.length}
+            </Typography>
+            <Typography variant="body2">
+              Answered questions: {Object.keys(answers).length}
+            </Typography>
+            <Typography variant="body2">
+              Unanswered questions: {assessment.questions.length - Object.keys(answers).length}
+            </Typography>
+            <Typography variant="body2">
+              Flagged questions: {flaggedQuestions.length}
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseSubmitDialog}>
+            Continue Editing
+          </Button>
+          <Button
+            onClick={handleSubmitAssessment}
+            variant="contained"
+            color="primary"
+            disabled={submitting}
+          >
+            {submitting ? 'Submitting...' : 'Submit Assessment'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };
+
+const CalendarIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>;
 
 export default AssessmentTake;

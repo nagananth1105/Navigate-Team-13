@@ -64,9 +64,9 @@ const mockCourses = [
       // More students...
     ],
     assessments: [
-      { id: '1', title: 'Midterm Exam', type: 'Exam', dueDate: '2025-10-15', avgScore: 82, submissions: 40 },
-      { id: '2', title: 'Binary Trees Implementation', type: 'Programming Assignment', dueDate: '2025-11-01', avgScore: 89, submissions: 42 },
-      { id: '3', title: 'Final Exam', type: 'Exam', dueDate: '2025-12-10', avgScore: 0, submissions: 0 }
+      { id: '1', title: 'Midterm Exam', syllabusTitle: 'Chapter 1-5', type: 'Exam', dueDate: '2025-10-15', avgScore: 82, submissions: 40, assignToAllStudents: true },
+      { id: '2', title: 'Binary Trees Implementation', syllabusTitle: 'Chapter 6', type: 'Programming Assignment', dueDate: '2025-11-01', avgScore: 89, submissions: 42, assignToAllStudents: false },
+      { id: '3', title: 'Final Exam', syllabusTitle: 'Chapter 1-10', type: 'Exam', dueDate: '2025-12-10', avgScore: 0, submissions: 0, assignToAllStudents: true }
     ],
     materials: [
       { id: '1', title: 'Introduction to Data Structures', type: 'Lecture Notes', week: 1, url: '#' },
@@ -118,19 +118,102 @@ const CourseManagement = () => {
   useEffect(() => {
     setLoading(true);
     
-    // In a real app, this would fetch data from an API
-    setTimeout(() => {
-      setCourses(mockCourses);
-      
-      if (courseId) {
-        const course = mockCourses.find(c => c.id === courseId);
-        if (course) {
-          setSelectedCourse(course);
+    // Try to fetch course data from API
+    const fetchCourseData = async () => {
+      try {
+        // In a real implementation, this would fetch from your real API
+        // const response = await axios.get(`/api/courses/${courseId || ''}`);
+        // setCourses(response.data.courses);
+        // if (courseId) {
+        //   setSelectedCourse(response.data.course);
+        // }
+        
+        // For now, use mock data with a simulated API delay
+        setTimeout(() => {
+          // Check localStorage for any saved assessments
+          try {
+            const savedAssessmentsString = localStorage.getItem('savedAssessments');
+            let savedAssessments = [];
+            
+            if (savedAssessmentsString) {
+              savedAssessments = JSON.parse(savedAssessmentsString);
+              console.log('Found saved assessments:', savedAssessments);
+              
+              // Update the mock courses with saved assessments
+              const updatedCourses = mockCourses.map(course => {
+                const courseAssessments = savedAssessments.filter(a => a.courseId === course.id);
+                
+                if (courseAssessments.length > 0) {
+                  return {
+                    ...course,
+                    assessments: [
+                      ...course.assessments,
+                      ...courseAssessments.map(a => ({
+                        id: a.id || `saved-${Date.now()}`,
+                        title: a.title,
+                        syllabusTitle: a.syllabusTitle || 'Generated Assessment',
+                        type: 'Quiz',
+                        dueDate: a.dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                        avgScore: 0,
+                        submissions: 0,
+                        assignToAllStudents: a.assignToAllStudents
+                      }))
+                    ],
+                    assessmentCount: course.assessmentCount + courseAssessments.length
+                  };
+                }
+                
+                return course;
+              });
+              
+              setCourses(updatedCourses);
+              
+              if (courseId) {
+                const course = updatedCourses.find(c => c.id === courseId);
+                if (course) {
+                  setSelectedCourse(course);
+                }
+              }
+            } else {
+              setCourses(mockCourses);
+              
+              if (courseId) {
+                const course = mockCourses.find(c => c.id === courseId);
+                if (course) {
+                  setSelectedCourse(course);
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Error processing saved assessments:', error);
+            setCourses(mockCourses);
+            
+            if (courseId) {
+              const course = mockCourses.find(c => c.id === courseId);
+              if (course) {
+                setSelectedCourse(course);
+              }
+            }
+          }
+          
+          setLoading(false);
+        }, 1000);
+      } catch (error) {
+        console.error('Error fetching course data:', error);
+        setCourses(mockCourses);
+        
+        if (courseId) {
+          const course = mockCourses.find(c => c.id === courseId);
+          if (course) {
+            setSelectedCourse(course);
+          }
         }
+        
+        setLoading(false);
       }
-      
-      setLoading(false);
-    }, 1000);
+    };
+    
+    fetchCourseData();
   }, [courseId]);
   
   // Handle tab change
@@ -204,6 +287,11 @@ const CourseManagement = () => {
   // Handle edit assessment
   const handleEditAssessment = (assessmentId) => {
     navigate(`/instructor/assessment/${assessmentId}`);
+  };
+
+  // Handle view assessment results
+  const handleViewResults = (assessmentId) => {
+    navigate(`/instructor/student-results/${selectedCourse.id}?assessment=${assessmentId}`);
   };
   
   if (loading) {
@@ -393,11 +481,13 @@ const CourseManagement = () => {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>Title</TableCell>
+                <TableCell>Assessment Title</TableCell>
+                <TableCell>Syllabus Title</TableCell>
                 <TableCell>Type</TableCell>
                 <TableCell>Due Date</TableCell>
                 <TableCell align="right">Submissions</TableCell>
                 <TableCell align="right">Avg. Score</TableCell>
+                <TableCell align="right">Status</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -407,6 +497,9 @@ const CourseManagement = () => {
                   <TableCell component="th" scope="row">
                     {assessment.title}
                   </TableCell>
+                  <TableCell>
+                    {assessment.syllabusTitle || 'N/A'}
+                  </TableCell>
                   <TableCell>{assessment.type}</TableCell>
                   <TableCell>{new Date(assessment.dueDate).toLocaleDateString()}</TableCell>
                   <TableCell align="right">
@@ -414,6 +507,13 @@ const CourseManagement = () => {
                   </TableCell>
                   <TableCell align="right">
                     {assessment.avgScore > 0 ? `${assessment.avgScore}%` : '-'}
+                  </TableCell>
+                  <TableCell align="right">
+                    <Chip 
+                      size="small" 
+                      label={assessment.assignToAllStudents ? 'Assigned' : 'Draft'} 
+                      color={assessment.assignToAllStudents ? 'success' : 'default'} 
+                    />
                   </TableCell>
                   <TableCell align="right">
                     <IconButton 
@@ -425,8 +525,17 @@ const CourseManagement = () => {
                     </IconButton>
                     <IconButton 
                       size="small" 
+                      onClick={() => handleViewResults(assessment.id)}
+                      aria-label="view results"
+                      sx={{ ml: 1 }}
+                    >
+                      <AssessmentIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton 
+                      size="small" 
                       onClick={() => handleOpenDialog('delete-assessment', assessment)}
                       aria-label="delete assessment"
+                      sx={{ ml: 1 }}
                     >
                       <DeleteIcon fontSize="small" />
                     </IconButton>
@@ -435,7 +544,7 @@ const CourseManagement = () => {
               ))}
               {selectedCourse.assessments.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} align="center">
+                  <TableCell colSpan={8} align="center">
                     No assessments created yet.
                   </TableCell>
                 </TableRow>

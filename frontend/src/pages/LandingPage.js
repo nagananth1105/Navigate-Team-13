@@ -21,7 +21,7 @@ const LandingPage = () => {
           <Grid container spacing={4} alignItems="center">
             <Grid item xs={12} md={6}>
               <Typography variant="h2" component="h1" gutterBottom fontWeight="bold">
-                Navigate
+                Navigate Labs
               </Typography>
               <Typography variant="h5" gutterBottom>
                 AI-Powered Assessment & Adaptive Learning Platform
@@ -68,11 +68,11 @@ const LandingPage = () => {
             <Grid item xs={12} md={6}>
               <Box
                 component="img"
-                src="/assets/hero-image.svg"
+                src="/navi.jpg"
                 alt="Navigate Platform"
                 sx={{
-                  width: '100%',
-                  maxWidth: 500,
+                  width: '70%',
+                  maxWidth: 350,
                   height: 'auto',
                   display: 'block',
                   mx: 'auto'
