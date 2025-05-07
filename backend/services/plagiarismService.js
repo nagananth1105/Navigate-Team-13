@@ -1,20 +1,4 @@
-const { Configuration, OpenAIApi } = require('openai');
-
-// Configure OpenAI with fallback mechanism
-let openai = null;
-try {
-  if (process.env.OPENAI_API_KEY) {
-    const configuration = new Configuration({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-    openai = new OpenAIApi(configuration);
-    console.log('OpenAI API initialized successfully');
-  } else {
-    console.log('OpenAI API key not found, will use fallback detection methods');
-  }
-} catch (error) {
-  console.error('Error initializing OpenAI API:', error);
-}
+// Using the specified model
 
 /**
  * Detect plagiarism in student response
@@ -23,24 +7,17 @@ try {
  */
 exports.detectPlagiarism = async (studentResponse) => {
   try {
-    // First try AI detection if available
-    let aiDetectionResult;
-    if (openai) {
-      aiDetectionResult = await detectPlagiarismWithAI(studentResponse);
-    } else {
-      aiDetectionResult = { score: 30, confidence: 40, method: 'fallback' };
-      console.log('Using fallback plagiarism detection (no OpenAI)');
-    }
+    // Use Hugging Face model for detection
+    const aiDetectionResult = await detectPlagiarismWithHuggingFace(studentResponse);
     
     // Use simple text analysis
     const textAnalysisResult = analyzeTextWithSimpleMetrics(studentResponse);
     
-    // Combine scores (weights can be adjusted)
-    // If OpenAI is not available, we rely more on text metrics
-    const openaiWeight = openai ? 0.7 : 0.3;
-    const metricsWeight = openai ? 0.3 : 0.7;
+    // Combine scores
+    const aiWeight = 0.7;
+    const metricsWeight = 0.3;
     
-    const combinedScore = (aiDetectionResult.score * openaiWeight) + (textAnalysisResult.score * metricsWeight);
+    const combinedScore = (aiDetectionResult.score * aiWeight) + (textAnalysisResult.score * metricsWeight);
     
     // Prepare feedback based on score
     let feedback = '';
@@ -69,60 +46,60 @@ exports.detectPlagiarism = async (studentResponse) => {
 };
 
 /**
- * Use AI to detect potential plagiarism
+ * Use Hugging Face model to detect potential plagiarism
  */
-async function detectPlagiarismWithAI(text) {
+async function detectPlagiarismWithHuggingFace(text) {
   try {
-    // Check if OpenAI API key is configured
-    if (!openai) {
-      console.log('OpenAI API not initialized, using fallback for plagiarism detection');
-      return { score: 25, confidence: 30, method: 'fallback' };
+    if (!huggingFaceApiKey) {
+      console.log('Using Hugging Face model without API key (limited capabilities)');
+      return analyzeTextWithSimpleMetrics(text); // Fallback to metrics-only if no API key
     }
 
     const prompt = `
-      You are an expert at detecting plagiarism in student work.
-      
-      Please analyze the following text for signs of plagiarism such as:
-      1. Unusual vocabulary or phrases that don't match typical student writing
-      2. Sophisticated sentence structure inconsistent with student level
-      3. Formal academic language mixed with informal language
-      4. Content that appears to be copied from common sources
+      Task: Analyze the following text for signs of plagiarism.
       
       Text to analyze:
       "${text.substring(0, 1000)}"
       
       Provide:
-      1. A plagiarism probability score from 0-100 (where 0 is definitely original and 100 is definitely plagiarized)
+      1. A plagiarism probability score from 0-100
       2. Your confidence level in this assessment (0-100)
-      3. Reasoning for your assessment
+      3. Brief reasoning
       
-      Format your response as:
-      Score: [number]
-      Confidence: [number]
-      Reasoning: [your analysis]
+      Format: Score: [number] | Confidence: [number] | Reasoning: [brief analysis]
     `;
     
-    const completion = await openai.createCompletion({
-      model: "text-davinci-003",
-      prompt,
-      max_tokens: 500,
-      temperature: 0.3,
-    });
-    
-    const response = completion.data.choices[0].text.trim();
+    // Call Hugging Face API
+    const response = await axios.post(
+      `https://api-inference.huggingface.co/models/${modelName}`,
+      { inputs: prompt },
+      { 
+        headers: { 
+          'Authorization': `Bearer ${huggingFaceApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 30000 // 30-second timeout
+      }
+    );
     
     // Parse the response
-    const scoreMatch = response.match(/Score:\s*(\d+)/i);
-    const confidenceMatch = response.match(/Confidence:\s*(\d+)/i);
+    let result = response.data;
+    if (Array.isArray(result)) {
+      result = result[0].generated_text || '';
+    }
+    
+    // Extract score and confidence from response
+    const scoreMatch = result.match(/Score:\s*(\d+)/i);
+    const confidenceMatch = result.match(/Confidence:\s*(\d+)/i);
     
     const score = scoreMatch ? parseInt(scoreMatch[1], 10) : 50;
     const confidence = confidenceMatch ? parseInt(confidenceMatch[1], 10) : 70;
     
-    return { score, confidence, method: 'openai' };
+    return { score, confidence, method: 'huggingface' };
   } catch (error) {
-    console.error('Error in AI plagiarism detection:', error);
-    // Fallback to text analysis if AI fails
-    return { score: 50, confidence: 20, method: 'fallback', error: error.message };
+    console.error('Error in Hugging Face plagiarism detection:', error);
+    // Fallback to text analysis if API fails
+    return { score: 50, confidence: 20, method: 'metrics-fallback', error: error.message };
   }
 }
 

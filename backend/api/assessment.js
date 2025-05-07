@@ -96,8 +96,31 @@ router.post('/analyze-syllabus', authMiddleware, async (req, res) => {
     
     console.log(`Analyzing syllabus content (${syllabusContent.length} chars)...`);
     
+    // Extract topics directly from syllabus content
+    let extractedTopics = [];
+    try {
+      // Try to use the service if available
+      const topicsExtraction = await syllabusAnalyzerService.extractTopicsFromSyllabus(syllabusContent);
+      extractedTopics = topicsExtraction.topics || [];
+    } catch (topicError) {
+      console.warn('Using fallback topic extraction:', topicError.message);
+      // Simple fallback pattern extraction
+      const topicsList = syllabusContent.match(/topics:[\s\S]*?((?:-|\d+\.)[^\n]+)/gi) || [];
+      extractedTopics = topicsList
+        .map(t => t.replace(/^(?:topics:|-|\d+\.)[\s]*/i, '').trim())
+        .filter(t => t.length > 3)
+        .slice(0, 10);
+    }
+    
     // Analyze the syllabus
     const syllabusAnalysis = await syllabusAnalyzerService.analyzeSyllabus(syllabusContent);
+    
+    // If no topics were extracted earlier, use the ones from syllabusAnalysis
+    if (extractedTopics.length === 0 && 
+        syllabusAnalysis.learningOutcomes && 
+        Array.isArray(syllabusAnalysis.learningOutcomes.keyTopics)) {
+      extractedTopics = syllabusAnalysis.learningOutcomes.keyTopics;
+    }
     
     // Generate an ID for this analysis
     const analysisId = crypto.createHash('md5').update(syllabusContent).digest('hex').substring(0, 8);
@@ -105,12 +128,13 @@ router.post('/analyze-syllabus', authMiddleware, async (req, res) => {
     // Store the analysis
     await syllabusAnalyzerService.storeSyllabusAnalysis(analysisId, syllabusAnalysis);
     
-    // Return the analysis
+    // Return the analysis with topics array for flexible topic selection
     res.status(200).json({
       success: true,
       message: 'Syllabus analyzed successfully',
       syllabusAnalysis,
-      analysisId
+      analysisId,
+      syllabusTopics: extractedTopics // Only include actual extracted topics
     });
   } catch (error) {
     console.error('Error analyzing syllabus:', error);

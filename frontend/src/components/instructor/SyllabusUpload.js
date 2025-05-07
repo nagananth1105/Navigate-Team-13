@@ -1,6 +1,6 @@
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import { Alert, Box, Button, Card, CardContent, Chip, CircularProgress, Divider, Grid, Paper, Step, StepLabel, Stepper, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Card, CardContent, Checkbox, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Divider, FormControlLabel, List, ListItem, Paper, Step, StepLabel, Stepper, TextField, Typography } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import axios from 'axios'; // Import axios instead of using fetch
 import React, { useEffect, useRef, useState } from 'react';
@@ -60,6 +60,9 @@ const SyllabusUpload = () => {
   const [generatingAssessment, setGeneratingAssessment] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
   const [apiAccessible, setApiAccessible] = useState(false);
+  const [syllabusTopics, setSyllabusTopics] = useState([]);
+  const [selectedTopics, setSelectedTopics] = useState([]);
+  const [topicDialogOpen, setTopicDialogOpen] = useState(false);
   const { currentUser, token } = useAuth(); // Get auth context
 
   const patternSectionRef = useRef(null);
@@ -114,7 +117,6 @@ const SyllabusUpload = () => {
         if (file.type === 'text/plain') {
           syllabusContent = textContent;
         } else {
-          // For non-text files, we'll need to upload the file to the server
           const formData = new FormData();
           formData.append('file', file);
           
@@ -140,7 +142,6 @@ const SyllabusUpload = () => {
 
       console.log(`Analyzing syllabus. Content length: ${syllabusContent.length} characters`);
       
-      // Make an actual API call to analyze the syllabus
       const analysisResponse = await api.post('/assessment/analyze-syllabus', { syllabusContent });
       
       if (analysisResponse.status !== 200) {
@@ -154,9 +155,18 @@ const SyllabusUpload = () => {
       }
       
       setSyllabusAnalysis(analysisData.syllabusAnalysis);
+      
+      if (analysisData.syllabusTopics && Array.isArray(analysisData.syllabusTopics)) {
+        setSyllabusTopics(analysisData.syllabusTopics);
+        setSelectedTopics(analysisData.syllabusTopics);
+      } else {
+        const fallbackTopics = analysisData.syllabusAnalysis.learningOutcomes?.keyTopics || [];
+        setSyllabusTopics(fallbackTopics);
+        setSelectedTopics(fallbackTopics);
+      }
+      
       setSuccess('Syllabus successfully analyzed! Proceeding to pattern selection.');
       
-      // Automatically proceed to the next step after successful analysis
       setActiveStep(1);
     } catch (err) {
       console.error('Error analyzing syllabus:', err);
@@ -185,53 +195,38 @@ const SyllabusUpload = () => {
 
       console.log("Generating assessment with pattern using Gemini API:", selectedPattern.name);
       
-      // Make an API call to generate questions using only Gemini API
       const response = await api.post('/assessment/generate-questions', {
         syllabusAnalysis: syllabusAnalysis,
         pattern: {
           ...selectedPattern,
-          // Ensure we're using Gemini API by explicitly specifying the model
+          topicFocus: selectedTopics,
           modelName: process.env.REACT_APP_GEMINI_MODEL || 'gemini-1.5-flash'
         }
       });
 
       if (response.status !== 200) {
-        const errorData = response.data || {};
-        throw new Error(`API error: ${response.status} ${response.statusText}. ${errorData.message || ''}`);
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
       }
-
+      
       const data = response.data;
       
       if (!data.success || !data.assessment) {
-        throw new Error(data.message || 'Failed to generate assessment from Gemini API');
+        throw new Error(data.message || 'Failed to generate assessment');
       }
       
-      console.log("Received assessment from Gemini API:", data.assessment);
-      
       setGeneratedAssessment(data.assessment);
-      setSuccess('Assessment successfully generated using Gemini API!');
+      setSuccess('Assessment successfully generated!');
       setActiveStep(2);
     } catch (err) {
       console.error('Error generating assessment:', err);
-      if (err.message.includes('401') || err.message.includes('Unauthorized')) {
-        setError('Authentication error. Please log in again to continue.');
-      } else {
-        setError(`Error generating assessment with Gemini API: ${err.message || 'Unknown error'}`);
-      }
+      setError(err.message || 'Error generating assessment. Please try again.');
     } finally {
       setGeneratingAssessment(false);
     }
   };
 
-  const handlePatternSelect = (pattern) => {
-    setSelectedPattern(pattern);
-  };
-
-  // Function to handle syllabus analysis when entering pattern selection step
   useEffect(() => {
-    // Only run analysis when user first enters step 1 (pattern selection)
     if (activeStep === 1 && !syllabusAnalysis && (file || textContent)) {
-      // Need to analyze the syllabus before showing patterns
       handleAnalyzeSyllabus();
     }
   }, [activeStep, syllabusAnalysis]);
@@ -239,6 +234,95 @@ const SyllabusUpload = () => {
   const handleBackToUpload = () => {
     setActiveStep(0);
   };
+  
+  const handleOpenTopicDialog = () => {
+    setTopicDialogOpen(true);
+  };
+  
+  const handleCloseTopicDialog = () => {
+    setTopicDialogOpen(false);
+  };
+  
+  const handleToggleTopic = (topic) => {
+    setSelectedTopics(prev => {
+      if (prev.includes(topic)) {
+        return prev.filter(t => t !== topic);
+      } else {
+        return [...prev, topic];
+      }
+    });
+  };
+  
+  const handleSelectAllTopics = () => {
+    setSelectedTopics([...syllabusTopics]);
+  };
+  
+  const handleDeselectAllTopics = () => {
+    setSelectedTopics([]);
+  };
+  
+  const renderTopicSelector = () => (
+    <Box mt={2} mb={2}>
+      <Box display="flex" justifyContent="space-between" alignItems="center">
+        <Typography variant="h6">Selected Topics ({selectedTopics.length}/{syllabusTopics.length})</Typography>
+        <Button 
+          variant="outlined" 
+          color="primary" 
+          onClick={handleOpenTopicDialog}
+        >
+          Manage Topics
+        </Button>
+      </Box>
+      
+      <Box mt={1} display="flex" flexWrap="wrap" gap={1}>
+        {selectedTopics.map((topic, index) => (
+          <Chip 
+            key={index} 
+            label={topic} 
+            color="primary" 
+            variant="outlined" 
+          />
+        ))}
+        {selectedTopics.length === 0 && (
+          <Typography color="text.secondary" variant="body2">No topics selected. Click "Manage Topics" to select topics for your assessment.</Typography>
+        )}
+      </Box>
+      
+      <Dialog open={topicDialogOpen} onClose={handleCloseTopicDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Typography variant="h6">Select Topics for Assessment</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Choose which topics to include in your assessment
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          <Box mb={2} display="flex" justifyContent="space-between">
+            <Button size="small" onClick={handleSelectAllTopics}>Select All</Button>
+            <Button size="small" onClick={handleDeselectAllTopics}>Deselect All</Button>
+          </Box>
+          <List sx={{ pt: 0 }}>
+            {syllabusTopics.map((topic, index) => (
+              <ListItem key={index} disablePadding>
+                <FormControlLabel
+                  control={
+                    <Checkbox 
+                      checked={selectedTopics.includes(topic)}
+                      onChange={() => handleToggleTopic(topic)}
+                    />
+                  }
+                  label={topic}
+                  sx={{ width: '100%', py: 0.5 }}
+                />
+              </ListItem>
+            ))}
+          </List>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseTopicDialog} color="primary">Done</Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
 
   const renderUploadSyllabusStep = () => (
     <Box>
@@ -346,11 +430,13 @@ const SyllabusUpload = () => {
         </Alert>
       )}
 
+      {syllabusTopics.length > 0 && renderTopicSelector()}
+
       <Box ref={patternSectionRef} mb={3}>
         <AssessmentPatternSelector
           courseId={null}
           syllabusAnalysis={syllabusAnalysis}
-          onPatternSelect={handlePatternSelect}
+          onPatternSelect={setSelectedPattern}
           onCustomPatternChange={() => {}}
           selectedPattern={selectedPattern}
         />
@@ -445,7 +531,6 @@ const SyllabusUpload = () => {
                   {question.question}
                 </Typography>
 
-                {/* Render options if multiple choice or true/false */}
                 {(question.options && question.options.length > 0) && (
                   <Box sx={{ ml: 2 }}>
                     {question.options.map((option, optIndex) => (
@@ -465,7 +550,6 @@ const SyllabusUpload = () => {
                   </Box>
                 )}
 
-                {/* Show answer for other questions */}
                 {(!question.options || question.options.length === 0) && question.correctAnswer && (
                   <Box sx={{ mt: 1 }}>
                     <Typography variant="subtitle2">
@@ -524,7 +608,6 @@ const SyllabusUpload = () => {
         Assessment Settings and Review
       </Typography>
 
-      {/* Settings form and final review would go here */}
       <Alert severity="info" sx={{ mb: 3 }}>
         Your assessment is ready for deployment. Review the settings below and make any final adjustments.
       </Alert>
@@ -541,7 +624,6 @@ const SyllabusUpload = () => {
           variant="contained"
           color="primary"
           onClick={() => {
-            // Handle save/deploy
             setSuccess('Assessment saved successfully!');
           }}
         >
@@ -570,7 +652,6 @@ const SyllabusUpload = () => {
           ))}
         </Stepper>
 
-        {/* Display error or success message */}
         {error && activeStep === 0 && (
           <Alert severity="error" sx={{ mb: 2 }}>
             {error}
@@ -582,7 +663,6 @@ const SyllabusUpload = () => {
           </Alert>
         )}
 
-        {/* Render the active step */}
         {activeStep === 0 && renderUploadSyllabusStep()}
         {activeStep === 1 && renderPatternSelectionStep()}
         {activeStep === 2 && renderQuestionsCustomizationStep()}

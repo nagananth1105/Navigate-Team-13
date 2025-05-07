@@ -3,14 +3,14 @@ const transformersModel = require('../models/transformersModel');
 require('dotenv').config();
 
 /**
- * Generate a quick quiz based on syllabus analysis - using GPT-2 as requested
+ * Generate a quick quiz based on syllabus analysis using Gemini
  * @param {Object} syllabusAnalysis - The analyzed syllabus data
  * @param {Object} quizParameters - Parameters for quiz generation
  * @returns {Object} - The generated quiz
  */
 async function generateQuickQuiz(syllabusAnalysis, quizParameters = {}) {
     try {
-        console.log('=== USING GPT-2 EXCLUSIVELY FOR QUIZ GENERATION ===');
+        console.log('=== GENERATING QUICK QUIZ WITH GEMINI ===');
         
         // Extract key syllabus information with defensive coding
         const basicInfo = syllabusAnalysis.basicInfo || { 
@@ -21,24 +21,24 @@ async function generateQuickQuiz(syllabusAnalysis, quizParameters = {}) {
         
         const learningOutcomes = syllabusAnalysis.learningOutcomes || {};
         const courseTopics = (learningOutcomes.keyTopics && Array.isArray(learningOutcomes.keyTopics)) 
-            ? learningOutcomes.keyTopics.slice(0, 5) // Limit to 5 topics for GPT-2's context window
+            ? learningOutcomes.keyTopics.slice(0, 5) 
             : ["Topic 1", "Topic 2", "Topic 3"];
         
         // Apply default parameters with fallbacks
         const {
-            questionCount = 5, // Reduced default for GPT-2's capabilities
+            questionCount = 5,
             difficulty = 'mixed',
-            questionTypes = ['multiple-choice', 'true-false'],  // Simplified types
+            questionTypes = ['multiple-choice', 'true-false'],
             topicFocus = [],
             timeLimit = 15
         } = quizParameters;
         
-        // Select topics to cover - limit to 3 max for GPT-2's context
+        // Select topics to cover
         const topicsToUse = topicFocus.length > 0 
-            ? topicFocus.slice(0, 3) 
-            : courseTopics.slice(0, Math.min(3, courseTopics.length));
+            ? topicFocus.slice(0, 5) 
+            : courseTopics.slice(0, Math.min(5, courseTopics.length));
         
-        // Build a simpler, more structured prompt optimized for GPT-2
+        // Build a structured prompt for Gemini
         const prompt = `
 Generate a quiz with ${questionCount} questions about ${topicsToUse.join(', ')}.
 
@@ -58,7 +58,7 @@ END
 
 Generate exactly ${questionCount} questions, one after another.`;
         
-        // Use transformers model with GPT-2 for quiz generation
+        // Use transformers model with Gemini
         const response = await transformersModel.createChatCompletion(
             'You are creating a quiz for students.',
             prompt,
@@ -66,14 +66,13 @@ Generate exactly ${questionCount} questions, one after another.`;
                 temperature: 0.8,
                 maxTokens: 2048,
                 taskType: 'quiz',
-                forceGPT2: true,
-                modelName: 'gpt2'
+                modelName: 'gemini-pro' // Use Gemini
             }
         );
         
-        // Parse the GPT-2 response which will likely be in a custom format
+        // Parse the Gemini response
         try {
-            // Parse the custom format response into structured quiz data
+            // Parse the response into structured quiz data
             const questions = [];
             const questionBlocks = response.split('END').filter(block => block.trim().length > 0);
             
@@ -143,7 +142,7 @@ Generate exactly ${questionCount} questions, one after another.`;
                 timeLimit: timeLimit,
                 questions: questions.length > 0 ? questions : generateFallbackQuestions(topicsToUse, questionCount),
                 generatedAt: new Date().toISOString(),
-                generatedBy: 'gpt-2',
+                generatedBy: 'gemini',
                 courseInfo: {
                     title: basicInfo.courseTitle,
                     code: basicInfo.courseCode,
@@ -151,10 +150,10 @@ Generate exactly ${questionCount} questions, one after another.`;
                 }
             };
             
-            console.log(`Successfully generated quiz with ${quiz.questions.length} questions using GPT-2`);
+            console.log(`Successfully generated quiz with ${quiz.questions.length} questions using Gemini`);
             return quiz;
         } catch (error) {
-            console.error('Error parsing quiz response from GPT-2:', error);
+            console.error('Error parsing quiz response from Gemini:', error);
             
             // Generate fallback questions directly
             return {
@@ -164,7 +163,7 @@ Generate exactly ${questionCount} questions, one after another.`;
                 timeLimit: timeLimit,
                 questions: generateFallbackQuestions(topicsToUse, questionCount),
                 generatedAt: new Date().toISOString(),
-                generatedBy: 'gpt-2-fallback',
+                generatedBy: 'gemini-fallback',
                 courseInfo: {
                     title: basicInfo.courseTitle,
                     code: basicInfo.courseCode,
@@ -173,13 +172,13 @@ Generate exactly ${questionCount} questions, one after another.`;
             };
         }
     } catch (error) {
-        console.error('Error generating quiz with GPT-2:', error);
-        throw new Error(`Failed to generate quiz with GPT-2: ${error.message}`);
+        console.error('Error generating quiz with Gemini:', error);
+        throw new Error(`Failed to generate quiz with Gemini: ${error.message}`);
     }
 }
 
 /**
- * Generate fallback questions when GPT-2 parsing fails
+ * Generate fallback questions when parsing fails
  * @param {Array} topics - Available topics
  * @param {Number} count - Number of questions to generate
  * @returns {Array} - Array of question objects
@@ -270,7 +269,7 @@ async function analyzeSyllabus(syllabusContent, options = {}) {
             extractPolicies = true
         } = options;
         
-        // Always use transformer models - no fallback to OpenAI
+        // Always use transformer models
         let modelPreference = options.modelPreference || 'transformer';
         
         // Build prompt for the model to extract structured information
@@ -308,8 +307,9 @@ Focus on accurately extracting course content, learning outcomes, and assessment
 If certain sections aren't present in the syllabus, leave them as empty arrays or empty strings.
 `;
 
-        // Use the Hugging Face model exclusively
-        console.log('Using transformers model for syllabus analysis');
+        // Use Gemini or Hugging Face fallback model
+        // Update model name to use the latest available model
+        console.log('Using Gemini model for syllabus analysis');
         const response = await transformersModel.createChatCompletion(
             'You are a helpful system for analyzing educational syllabi.',
             prompt,
@@ -317,7 +317,7 @@ If certain sections aren't present in the syllabus, leave them as empty arrays o
                 temperature: 0.3,
                 maxTokens: 4000,
                 taskType: 'extraction',
-                modelName: 'gpt2-medium' // Use gpt2-medium for syllabus analysis
+                modelName: 'gemini-1.5-flash' // Updated to use the latest available model
             }
         );
         
@@ -346,7 +346,7 @@ If certain sections aren't present in the syllabus, leave them as empty arrays o
         // Add metadata
         analysisResult.metadata = {
             analyzedAt: new Date().toISOString(),
-            modelUsed: 'huggingface/gpt2-medium',
+            modelUsed: 'gemini-1.5-flash',
             contentLength: syllabusContent.length
         };
         
@@ -354,7 +354,8 @@ If certain sections aren't present in the syllabus, leave them as empty arrays o
         return analysisResult;
     } catch (error) {
         console.error('Error analyzing syllabus:', error);
-        throw new Error(`Failed to analyze syllabus: ${error.message}`);
+        console.log('Generating default syllabus analysis structure');
+        return generateBasicSyllabusStructure(syllabusContent);
     }
 }
 
@@ -505,6 +506,160 @@ async function extractTextFromFile(file) {
 }
 
 /**
+ * Extract topics from syllabus content
+ * @param {string} syllabusContent - Raw text content of the syllabus
+ * @returns {Object} - Object containing the extracted topics
+ */
+async function extractTopicsFromSyllabus(syllabusContent) {
+    try {
+        console.log('Extracting topics from syllabus content...');
+        
+        if (!syllabusContent || syllabusContent.trim().length < 50) {
+            throw new Error('Syllabus content is too short for meaningful topic extraction');
+        }
+        
+        // Build a prompt focused specifically on topic extraction
+        const prompt = `
+Extract the main topics covered in this syllabus. Focus only on the academic subjects, 
+course modules, or knowledge areas that will be taught, not administrative details.
+Return the result as a JSON array of strings, with each string being a course topic.
+
+Example:
+If extracting from a Computer Science syllabus, the result might be:
+["Introduction to Programming", "Data Structures", "Algorithms", "Database Systems", "Web Development"]
+
+Syllabus content:
+${syllabusContent.substring(0, 8000)}
+
+Topics (JSON array of strings):
+`;
+
+        // Use transformer model to extract topics
+        const response = await transformersModel.createChatCompletion(
+            'You are a system for extracting course topics from educational syllabi.',
+            prompt,
+            {
+                temperature: 0.3,
+                maxTokens: 1000,
+                taskType: 'extraction',
+                modelName: 'gemini-pro'
+            }
+        );
+        
+        // Extract JSON array from response
+        let topics = [];
+        const jsonMatch = response.match(/\[[\s\S]*\]/);
+        
+        if (jsonMatch) {
+            try {
+                topics = JSON.parse(jsonMatch[0]);
+                
+                // Ensure topics is an array of strings
+                if (!Array.isArray(topics)) {
+                    topics = [];
+                }
+                
+                // Clean up topics - remove any that are too short or not strings
+                topics = topics
+                    .filter(topic => typeof topic === 'string' && topic.trim().length > 2)
+                    .map(topic => topic.trim());
+                
+            } catch (parseError) {
+                console.error('Error parsing topics JSON from model response:', parseError);
+                // If we can't parse JSON, extract topics using regex patterns
+                topics = extractTopicsUsingPatterns(syllabusContent);
+            }
+        } else {
+            console.log('No JSON topics array found in response, using pattern extraction');
+            topics = extractTopicsUsingPatterns(syllabusContent);
+        }
+        
+        // If we couldn't extract any topics, return an empty array, not defaults
+        if (!topics || topics.length === 0) {
+            console.log('No topics found, returning empty array');
+            topics = [];
+        }
+        
+        // Limit to a reasonable number of topics
+        topics = topics.slice(0, 15);
+        
+        return {
+            topics,
+            metadata: {
+                extractedAt: new Date().toISOString(),
+                modelUsed: 'gemini-pro',
+                topicCount: topics.length
+            }
+        };
+    } catch (error) {
+        console.error('Error extracting topics from syllabus:', error);
+        // Return empty array on error, not defaults
+        return {
+            topics: [],
+            metadata: {
+                extractedAt: new Date().toISOString(),
+                modelUsed: 'fallback',
+                error: error.message
+            }
+        };
+    }
+}
+
+/**
+ * Extract topics using regex patterns when AI extraction fails
+ * @private
+ * @param {string} syllabusContent - Raw text content of the syllabus
+ * @returns {Array} - Array of topic strings
+ */
+function extractTopicsUsingPatterns(syllabusContent) {
+    // Look for common topic patterns in the syllabus
+    const topics = [];
+    
+    // Match sections that might contain topics
+    const contentSections = syllabusContent.match(/(?:topics|content|subject|curriculum|modules|units|lessons)[ :].+?(?:\n\n|\n\r\n|$)/gi) || [];
+    
+    // Process each potential section to extract topics
+    for (const section of contentSections) {
+        // Look for bulleted or numbered list items
+        const listItems = section.match(/[-•*][ \t](.+?)(?:\n|$)/g) || 
+                          section.match(/\d+\.[ \t](.+?)(?:\n|$)/g) || 
+                          section.match(/[A-Z]\.[ \t](.+?)(?:\n|$)/g);
+        
+        if (listItems && listItems.length > 0) {
+            for (const item of listItems) {
+                // Clean up the item
+                const cleaned = item.replace(/^[-•*\d.A-Z][ \t]+/, '').trim();
+                if (cleaned.length > 3 && !topics.includes(cleaned)) {
+                    topics.push(cleaned);
+                }
+            }
+        }
+    }
+    
+    // Look for potential topics in headings or bold text
+    const headings = syllabusContent.match(/#{1,6}[ \t](.+?)(?:\n|$)/g) || 
+                     syllabusContent.match(/\*\*(.+?)\*\*/g) || 
+                     syllabusContent.match(/Chapter \d+:[ \t](.+?)(?:\n|$)/gi);
+    
+    if (headings && headings.length > 0) {
+        for (const heading of headings) {
+            // Clean up the heading
+            const cleaned = heading.replace(/^#{1,6}[ \t]+/, '')
+                                 .replace(/^\*\*|\*\*$/g, '')
+                                 .replace(/^Chapter \d+:[ \t]+/i, '')
+                                 .trim();
+            
+            if (cleaned.length > 3 && !topics.includes(cleaned) && 
+                !cleaned.match(/course|syllabus|overview|assessment|grading|schedule|policy|objective/i)) {
+                topics.push(cleaned);
+            }
+        }
+    }
+    
+    return topics;
+}
+
+/**
  * Get list of analyzed syllabi (mock implementation)
  * @returns {Array} - List of syllabi
  */
@@ -534,25 +689,196 @@ async function getSyllabiList() {
  */
 async function generateAssessment(syllabusAnalysis, preferences = {}) {
     try {
-        // This is a simplified implementation
-        // In a real application, this would use more sophisticated generation logic
+        console.log(`Generating assessment with pattern:`, JSON.stringify(preferences.pattern || {}));
         
         // Extract key topics from syllabus analysis
         const topics = syllabusAnalysis.learningOutcomes?.keyTopics || [];
+        const pattern = preferences.pattern || {};
         
-        // Create a basic assessment structure
+        // Use the latest available model name
+        const modelName = preferences.modelName || pattern.modelName || 'gemini-1.5-flash';
+        console.log(`Using model ${modelName} for assessment generation`);
+        
+        // Build a detailed prompt with the syllabus information and pattern
+        const prompt = `
+Generate an assessment for a course based on the following syllabus information:
+
+Course: ${syllabusAnalysis.basicInfo?.courseTitle || 'Untitled Course'}
+Code: ${syllabusAnalysis.basicInfo?.courseCode || 'Unknown'}
+Level: ${syllabusAnalysis.basicInfo?.academicLevel || 'Undergraduate'}
+
+Key Topics: ${topics.join(', ')}
+
+Assessment Pattern:
+- Name: ${pattern.name || 'Standard Assessment'}
+- Difficulty: ${pattern.difficulty || 'Medium'}
+- Question Distribution: ${JSON.stringify(pattern.questionDistribution || [])}
+- Time Limit: ${pattern.timeLimit || 60} minutes
+
+Please create a complete assessment with diverse questions covering the key topics. For each question:
+1. Write a clear question text
+2. Specify the question type (multiple-choice, true-false, short-answer, etc.)
+3. For multiple-choice questions, provide 4 options with the correct answer
+4. Indicate the topic the question relates to
+5. Specify difficulty level
+6. Assign appropriate point value
+
+Generate questions that match the pattern's difficulty level and distribution.
+Format each question as follows:
+
+Question 1: [Question text]
+Type: [multiple-choice/true-false/short-answer]
+Option A: [Option text]
+Option B: [Option text]
+Option C: [Option text]
+Option D: [Option text]
+Correct Answer: [A/B/C/D]
+Topic: [Related topic]
+Difficulty: [Easy/Medium/Hard]
+Points: [point value]
+
+Question 2: ...
+`;
+
+        // Use transformers model with the latest model name
+        console.log('Calling model to generate assessment...');
+        const response = await transformersModel.createChatCompletion(
+            'You are an expert assessment creator for educational courses.',
+            prompt,
+            {
+                temperature: 0.7,
+                maxTokens: 4000,
+                modelName: modelName,
+                topP: 0.9
+            }
+        );
+        
+        // Parse the response to extract questions
+        console.log('Parsing model response for assessment questions...');
+        
+        // Process the response to extract questions - use simple parsing rather than expecting JSON
+        const questions = [];
+        const questionRegex = /Question\s+(\d+):\s*(.*?)(?=\s*Question\s+\d+:|$)/gs;
+        const questionMatches = [...response.matchAll(questionRegex)];
+        
+        if (questionMatches && questionMatches.length > 0) {
+            for (let i = 0; i < questionMatches.length; i++) {
+                const questionBlock = questionMatches[i][2];
+                
+                // Extract question details using regex
+                const typeMatch = questionBlock.match(/Type:\s*(multiple-choice|true-false|short-answer)/i);
+                const questionType = typeMatch ? typeMatch[1].toLowerCase() : 'multiple-choice';
+                
+                // Extract options for multiple-choice
+                const options = [];
+                if (questionType === 'multiple-choice') {
+                    const optionA = questionBlock.match(/Option\s+A:\s*(.*?)(?=\s*Option\s+B:|$)/i);
+                    const optionB = questionBlock.match(/Option\s+B:\s*(.*?)(?=\s*Option\s+C:|$)/i);
+                    const optionC = questionBlock.match(/Option\s+C:\s*(.*?)(?=\s*Option\s+D:|$)/i);
+                    const optionD = questionBlock.match(/Option\s+D:\s*(.*?)(?=\s*Correct\s+Answer:|$)/i);
+                    
+                    if (optionA) options.push(optionA[1].trim());
+                    if (optionB) options.push(optionB[1].trim());
+                    if (optionC) options.push(optionC[1].trim());
+                    if (optionD) options.push(optionD[1].trim());
+                } else if (questionType === 'true-false') {
+                    options.push('True');
+                    options.push('False');
+                }
+                
+                // Extract correct answer
+                let correctAnswer = '';
+                const correctAnswerMatch = questionBlock.match(/Correct\s+Answer:\s*([A-D]|True|False)/i);
+                if (correctAnswerMatch) {
+                    const correctAnswerLetter = correctAnswerMatch[1];
+                    if (questionType === 'multiple-choice') {
+                        const index = correctAnswerLetter.charCodeAt(0) - 'A'.charCodeAt(0);
+                        if (index >= 0 && index < options.length) {
+                            correctAnswer = options[index];
+                        } else {
+                            correctAnswer = options[0] || '';
+                        }
+                    } else if (questionType === 'true-false') {
+                        correctAnswer = correctAnswerLetter;
+                    }
+                } else {
+                    // Default to first option or "True" if no correct answer specified
+                    correctAnswer = questionType === 'multiple-choice' ? (options[0] || '') : 'True';
+                }
+                
+                // Extract other metadata
+                const topicMatch = questionBlock.match(/Topic:\s*(.*?)(?=\s*Difficulty:|$)/i);
+                const topic = topicMatch ? topicMatch[1].trim() : (topics[i % topics.length] || 'General');
+                
+                const difficultyMatch = questionBlock.match(/Difficulty:\s*(Easy|Medium|Hard)/i);
+                const difficulty = difficultyMatch ? difficultyMatch[1] : (pattern.difficulty || 'Medium');
+                
+                const pointsMatch = questionBlock.match(/Points:\s*(\d+)/i);
+                const points = pointsMatch ? parseInt(pointsMatch[1]) : (
+                    questionType === 'multiple-choice' ? 2 : 
+                    questionType === 'true-false' ? 1 : 5
+                );
+                
+                // Extract the actual question text
+                const questionTextMatch = questionBlock.match(/^(.*?)(?=\s*Type:|$)/i);
+                const questionText = questionTextMatch ? questionTextMatch[1].trim() : `Question about ${topic}`;
+                
+                // Add the question to our array
+                questions.push({
+                    id: `q${i + 1}`,
+                    question: questionText,
+                    questionType: questionType,
+                    options: options,
+                    correctAnswer: correctAnswer,
+                    topic: topic,
+                    difficulty: difficulty,
+                    points: points,
+                    explanation: `This question tests understanding of ${topic}.`
+                });
+            }
+        }
+        
+        // If we couldn't extract questions, generate fallback ones
+        if (questions.length === 0) {
+            console.log('Could not extract questions from model response, generating fallbacks...');
+            return {
+                title: `${syllabusAnalysis.basicInfo?.courseTitle || 'Course'} Assessment`,
+                description: `Assessment based on the course syllabus`,
+                totalPoints: 100,
+                timeLimit: preferences.timeLimit || pattern.timeLimit || 60,
+                questions: generateBasicQuestions(topics, preferences),
+                dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
+                generatedAt: new Date().toISOString(),
+                generatedBy: 'fallback-system'
+            };
+        }
+        
+        // Return the assessment with the extracted questions
         return {
             title: `${syllabusAnalysis.basicInfo?.courseTitle || 'Course'} Assessment`,
-            description: `Assessment based on the course syllabus`,
-            totalPoints: 100,
-            timeLimit: preferences.timeLimit || 60, // minutes
-            questions: generateBasicQuestions(topics, preferences),
-            dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
-            generatedAt: new Date().toISOString()
+            description: `${pattern.name || 'Standard'} assessment covering key course topics`,
+            totalPoints: questions.reduce((sum, q) => sum + q.points, 0),
+            timeLimit: preferences.timeLimit || pattern.timeLimit || 60,
+            questions: questions,
+            dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+            generatedAt: new Date().toISOString(),
+            generatedBy: modelName
         };
     } catch (error) {
         console.error('Error generating assessment:', error);
-        throw new Error(`Failed to generate assessment: ${error.message}`);
+        
+        // Generate fallback questions on error
+        const topics = syllabusAnalysis.learningOutcomes?.keyTopics || [];
+        return {
+            title: `${syllabusAnalysis.basicInfo?.courseTitle || 'Course'} Assessment`,
+            description: `Assessment based on the course syllabus (fallback mode)`,
+            totalPoints: 100,
+            timeLimit: preferences.timeLimit || 60,
+            questions: generateBasicQuestions(topics, preferences),
+            dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+            generatedAt: new Date().toISOString(),
+            generatedBy: 'error-fallback'
+        };
     }
 }
 
@@ -606,6 +932,7 @@ module.exports = {
     generateQuickQuiz,
     analyzeSyllabus,
     extractTextFromFile,
+    extractTopicsFromSyllabus,
     getSyllabiList,
     generateAssessment,
     generateFallbackSyllabusAnalysis

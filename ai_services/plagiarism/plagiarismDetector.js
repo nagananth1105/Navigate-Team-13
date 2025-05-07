@@ -13,13 +13,28 @@ require('dotenv').config();
  */
 class PlagiarismDetector {
   constructor() {
-    this.openai = axios.create({
-      baseURL: 'https://api.openai.com/v1',
+    this.gemini = axios.create({
+      baseURL: 'https://generativelanguage.googleapis.com/v1/models',
       headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      params: {
+        key: process.env.GEMINI_API_KEY
+      }
+    });
+    
+    // For embeddings and advanced analysis
+    this.huggingFace = axios.create({
+      baseURL: 'https://api-inference.huggingface.co/models',
+      headers: {
+        'Authorization': `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
         'Content-Type': 'application/json'
       }
     });
+    
+    // Model names
+    this.geminiModel = process.env.GEMINI_MODEL || 'gemini-pro';
+    this.embeddingModel = process.env.EMBEDDING_MODEL || 'sentence-transformers/all-MiniLM-L6-v2';
     
     // Similarity threshold for flagging content (0.0 to 1.0)
     this.similarityThreshold = 0.85;
@@ -203,18 +218,29 @@ Return your response as a JSON object with this structure:
   "evidence": [if similarity > 0.7, provide the similar sections, otherwise null]
 }`;
 
-        const response = await this.openai.post('/chat/completions', {
-          model: "gpt-4o",
-          messages: [
-            { role: "system", content: "You are a plagiarism detection expert. Be objective and analytical." },
-            { role: "user", content: prompt }
+        // Request body for Gemini
+        const requestBody = {
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: `As a plagiarism detection expert, be objective and analytical: ${prompt}` }]
+            }
           ],
-          temperature: 0.1,
-          max_tokens: 500
-        });
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 500,
+            topP: 0.95,
+            topK: 40
+          }
+        };
+
+        const response = await this.gemini.post(
+          `/${this.geminiModel}:generateContent`,
+          requestBody
+        );
 
         // Parse the response
-        const content = response.data.choices[0].message.content;
+        const content = response.data.candidates[0].content.parts[0].text;
         const jsonStart = content.indexOf('{');
         const jsonEnd = content.lastIndexOf('}') + 1;
         const resultJson = JSON.parse(content.substring(jsonStart, jsonEnd));
@@ -242,13 +268,13 @@ Return your response as a JSON object with this structure:
    */
   async _embeddingBasedSimilarityCheck(currentAnswer, previousAnswers) {
     try {
-      // Get embedding for current answer
-      const currentEmbeddingResponse = await this.openai.post('/embeddings', {
-        model: "text-embedding-3-small",
-        input: currentAnswer
-      });
+      // Get embedding for current answer using Hugging Face
+      const currentEmbeddingResponse = await this.huggingFace.post(
+        `/${this.embeddingModel}`,
+        { inputs: currentAnswer }
+      );
       
-      const currentEmbedding = currentEmbeddingResponse.data.data[0].embedding;
+      const currentEmbedding = currentEmbeddingResponse.data;
       
       // Process previous answers in batches to avoid hitting rate limits
       const batchSize = 20;
@@ -259,13 +285,12 @@ Return your response as a JSON object with this structure:
         const batch = previousAnswers.slice(i, i + batchSize);
         
         // Get embeddings for batch
-        const inputs = batch.map(a => a.answer);
-        const embeddingResponse = await this.openai.post('/embeddings', {
-          model: "text-embedding-3-small",
-          input: inputs
-        });
+        const batchPromises = batch.map(a => 
+          this.huggingFace.post(`/${this.embeddingModel}`, { inputs: a.answer })
+            .then(response => response.data)
+        );
         
-        const embeddings = embeddingResponse.data.data.map(item => item.embedding);
+        const embeddings = await Promise.all(batchPromises);
         
         // Calculate similarity scores for each answer in batch
         for (let j = 0; j < batch.length; j++) {
@@ -353,18 +378,29 @@ Return your analysis as a JSON object with:
   "evidence": [specific examples from the text supporting your conclusion]
 }`;
 
-      const response = await this.openai.post('/chat/completions', {
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: "You are an expert at detecting AI-generated content." },
-          { role: "user", content: prompt }
+      // Request body for Gemini
+      const requestBody = {
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: `As an expert at detecting AI-generated content: ${prompt}` }]
+          }
         ],
-        temperature: 0.1,
-        max_tokens: 500
-      });
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 500,
+          topP: 0.95,
+          topK: 40
+        }
+      };
+
+      const response = await this.gemini.post(
+        `/${this.geminiModel}:generateContent`,
+        requestBody
+      );
 
       // Parse the response
-      const content = response.data.choices[0].message.content;
+      const content = response.data.candidates[0].content.parts[0].text;
       const jsonStart = content.indexOf('{');
       const jsonEnd = content.lastIndexOf('}') + 1;
       
@@ -410,18 +446,29 @@ Return your analysis as a JSON array with potential sources:
 If you cannot identify any specific potential sources, return an empty array: []
 `;
 
-      const response = await this.openai.post('/chat/completions', {
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: "You are an expert at identifying potential sources of plagiarized content." },
-          { role: "user", content: prompt }
+      // Request body for Gemini
+      const requestBody = {
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: `As an expert at identifying potential sources of plagiarized content: ${prompt}` }]
+          }
         ],
-        temperature: 0.1,
-        max_tokens: 800
-      });
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 800,
+          topP: 0.95,
+          topK: 40
+        }
+      };
+
+      const response = await this.gemini.post(
+        `/${this.geminiModel}:generateContent`, 
+        requestBody
+      );
 
       // Parse the response
-      const content = response.data.choices[0].message.content;
+      const content = response.data.candidates[0].content.parts[0].text;
       
       try {
         const jsonStartIndex = content.indexOf('[');
@@ -472,18 +519,29 @@ Return your analysis as a JSON object:
 }
 `;
 
-      const response = await this.openai.post('/chat/completions', {
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: "You are an expert linguist specializing in identifying cross-language translation artifacts." },
-          { role: "user", content: prompt }
+      // Request body for Gemini
+      const requestBody = {
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: `As an expert linguist specializing in identifying cross-language translation artifacts: ${prompt}` }]
+          }
         ],
-        temperature: 0.1,
-        max_tokens: 800
-      });
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 800,
+          topP: 0.95,
+          topK: 40
+        }
+      };
+
+      const response = await this.gemini.post(
+        `/${this.geminiModel}:generateContent`,
+        requestBody
+      );
 
       // Parse the response
-      const content = response.data.choices[0].message.content;
+      const content = response.data.candidates[0].content.parts[0].text;
       
       try {
         const jsonStartIndex = content.indexOf('{');
@@ -541,18 +599,29 @@ Format your response as a JSON object:
 }
 `;
 
-      const response = await this.openai.post('/chat/completions', {
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: "You are an academic integrity educator who helps students understand and improve their academic writing." },
-          { role: "user", content: prompt }
+      // Request body for Gemini
+      const requestBody = {
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: `As an academic integrity educator who helps students understand and improve their academic writing: ${prompt}` }]
+          }
         ],
-        temperature: 0.4,
-        max_tokens: 1000
-      });
+        generationConfig: {
+          temperature: 0.4,
+          maxOutputTokens: 1000,
+          topP: 0.95,
+          topK: 40
+        }
+      };
+
+      const response = await this.gemini.post(
+        `/${this.geminiModel}:generateContent`,
+        requestBody
+      );
 
       // Parse the response
-      const content = response.data.choices[0].message.content;
+      const content = response.data.candidates[0].content.parts[0].text;
       const jsonStartIndex = content.indexOf('{');
       const jsonEndIndex = content.lastIndexOf('}') + 1;
       

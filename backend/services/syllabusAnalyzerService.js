@@ -36,6 +36,22 @@ exports.analyzeSyllabus = async (syllabusContent, options = {}) => {
 };
 
 /**
+ * Extract topics from syllabus content
+ * @param {string} syllabusContent - Raw text content of the syllabus
+ * @returns {Promise<Object>} - Object containing the extracted topics
+ */
+exports.extractTopicsFromSyllabus = async (syllabusContent) => {
+  try {
+    // Use the syllabusAnalyzer to extract topics
+    const topics = await syllabusAnalyzer.extractTopicsFromSyllabus(syllabusContent);
+    return topics;
+  } catch (error) {
+    console.error('Error in extractTopicsFromSyllabus service:', error);
+    throw new Error(`Failed to extract topics from syllabus: ${error.message}`);
+  }
+};
+
+/**
  * Get list of analyzed syllabi
  * @returns {Promise<Array>} - List of syllabi
  */

@@ -13,11 +13,13 @@ require('dotenv').config();
  */
 class ExpertPanelService {
   constructor() {
-    this.openai = axios.create({
-      baseURL: 'https://api.openai.com/v1',
+    this.gemini = axios.create({
+      baseURL: 'https://generativelanguage.googleapis.com/v1/models',
       headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
         'Content-Type': 'application/json'
+      },
+      params: {
+        key: process.env.GEMINI_API_KEY
       }
     });
     
@@ -29,6 +31,9 @@ class ExpertPanelService {
       'critical-thinking-evaluator',
       'domain-expert'
     ];
+    
+    // Gemini model to use
+    this.geminiModel = process.env.GEMINI_MODEL || 'gemini-pro';
   }
 
   /**
@@ -143,18 +148,29 @@ Format your response as a JSON object with the following structure:
 }
       `;
 
-      const response = await this.openai.post('/chat/completions', {
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: "You are an educational assessment expert who synthesizes multiple perspectives." },
-          { role: "user", content: prompt }
+      // Request body for Gemini
+      const requestBody = {
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: `As an educational assessment expert who synthesizes multiple perspectives: ${prompt}` }]
+          }
         ],
-        temperature: 0.3,
-        max_tokens: 800
-      });
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 800,
+          topP: 0.9,
+          topK: 40
+        }
+      };
 
-      // Parse the AI response
-      const content = response.data.choices[0].message.content;
+      const response = await this.gemini.post(
+        `/${this.geminiModel}:generateContent`,
+        requestBody
+      );
+
+      // Parse the Gemini response
+      const content = response.data.candidates[0].content.parts[0].text;
       const jsonStart = content.indexOf('{');
       const jsonEnd = content.lastIndexOf('}') + 1;
       return JSON.parse(content.substring(jsonStart, jsonEnd));
@@ -391,17 +407,28 @@ Format your response as:
    */
   async _getExpertAnalysis(prompt) {
     try {
-      const response = await this.openai.post('/chat/completions', {
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: "You are an expert educational evaluator." },
-          { role: "user", content: prompt }
+      // Request body for Gemini
+      const requestBody = {
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: `As an expert educational evaluator: ${prompt}` }]
+          }
         ],
-        temperature: 0.3,
-        max_tokens: 500
-      });
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 500,
+          topP: 0.9,
+          topK: 40
+        }
+      };
+
+      const response = await this.gemini.post(
+        `/${this.geminiModel}:generateContent`,
+        requestBody
+      );
       
-      const content = response.data.choices[0].message.content.trim();
+      const content = response.data.candidates[0].content.parts[0].text.trim();
       
       // Parse JSON response
       try {

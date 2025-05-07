@@ -1,13 +1,19 @@
-const { Configuration, OpenAIApi } = require('openai');
 const LearningPath = require('../models/LearningPath');
 const Submission = require('../models/Submission');
 const Course = require('../models/Course');
+const axios = require('axios');
+require('dotenv').config();
 
-// Configure OpenAI
-const configuration = new Configuration({
-  apiKey: process.env.OPENAI_API_KEY,
+// Configure Gemini API
+const gemini = axios.create({
+  baseURL: 'https://generativelanguage.googleapis.com/v1beta/models',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  params: {
+    key: process.env.GEMINI_API_KEY
+  }
 });
-const openai = new OpenAIApi(configuration);
 
 /**
  * Generate or update a personalized learning path based on assessment results
@@ -191,7 +197,7 @@ async function generateRecommendations(weakConcepts, curriculumMap) {
         url: resource
       }));
     } else {
-      // Generate AI recommendations if not in curriculum map
+      // Generate Gemini recommendations if not in curriculum map
       try {
         const prompt = `
           You are an educational resource specialist helping students learn about "${concept}".
@@ -207,19 +213,20 @@ async function generateRecommendations(weakConcepts, curriculumMap) {
           Reading: [title] | [url]
         `;
         
-        const completion = await openai.createCompletion({
-          model: "text-davinci-003",
-          prompt,
-          max_tokens: 200,
+        const response = await gemini.post('/text-bison-001:generateText', {
+          prompt: {
+            text: prompt
+          },
           temperature: 0.7,
+          candidateCount: 1
         });
         
-        const response = completion.data.choices[0].text.trim();
+        const completion = response.data.candidates[0].output;
         
-        // Parse AI suggestions
-        const videoMatch = response.match(/Video:(.+)/);
-        const exerciseMatch = response.match(/Exercise:(.+)/);
-        const readingMatch = response.match(/Reading:(.+)/);
+        // Parse Gemini suggestions
+        const videoMatch = completion.match(/Video:(.+)/);
+        const exerciseMatch = completion.match(/Exercise:(.+)/);
+        const readingMatch = completion.match(/Reading:(.+)/);
         
         recommendations[concept] = [];
         
@@ -334,17 +341,18 @@ async function generateLearningPath(masteredConcepts, weakConcepts, curriculumMa
         - [activity 3]
       `;
       
-      const completion = await openai.createCompletion({
-        model: "text-davinci-003",
-        prompt,
-        max_tokens: 200,
+      const response = await gemini.post('/text-bison-001:generateText', {
+        prompt: {
+          text: prompt
+        },
         temperature: 0.7,
+        candidateCount: 1
       });
       
-      const response = completion.data.choices[0].text.trim();
+      const completion = response.data.candidates[0].output;
       
       // Parse activities
-      recommendation.suggestedActivities = response
+      recommendation.suggestedActivities = completion
         .split('-')
         .map(activity => activity.trim())
         .filter(activity => activity.length > 0);
