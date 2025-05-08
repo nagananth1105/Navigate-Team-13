@@ -1,17 +1,26 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
-  Box, Container, Typography, Paper, Grid, Button, Card, CardContent,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Tabs, Tab, Chip, CircularProgress, Alert, Divider
-} from '@mui/material';
-import { 
-  ArrowBack as ArrowBackIcon,
-  Assessment as AssessmentIcon,
-  Person as PersonIcon,
-  TrendingUp as TrendingUpIcon,
-  Description as DescriptionIcon
+    ArrowBack as ArrowBackIcon,
+    Assessment as AssessmentIcon,
+    Description as DescriptionIcon,
+    Person as PersonIcon,
+    TrendingUp as TrendingUpIcon
 } from '@mui/icons-material';
+import {
+    Alert,
+    Box,
+    Button, Card, CardContent,
+    Chip, CircularProgress,
+    Container,
+    Divider,
+    Grid,
+    Paper,
+    Tab,
+    Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+    Tabs,
+    Typography
+} from '@mui/material';
+import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
 // Mock data moved to a separate constant at the bottom for clarity

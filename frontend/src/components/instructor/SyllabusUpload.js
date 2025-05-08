@@ -1,12 +1,11 @@
-import AssignmentIcon from '@mui/icons-material/Assignment';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { Alert, Box, Button, Card, CardContent, Checkbox, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Divider, FormControlLabel, List, ListItem, Paper, Step, StepLabel, Stepper, TextField, Typography } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import axios from 'axios'; // Import axios instead of using fetch
 import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom'; // Import useNavigate hook
 import { useAuth } from '../../contexts/AuthContext'; // Import useAuth hook
 import AssessmentPatternSelector from './AssessmentPatternSelector';
-import { useNavigate } from 'react-router-dom'; // Import useNavigate hook
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 

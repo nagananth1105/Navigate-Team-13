@@ -1,41 +1,41 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import {
-  Box,
-  Container,
-  Typography,
-  Paper,
-  Grid,
-  Card,
-  CardContent,
-  Button,
-  CircularProgress,
-  Divider,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  Chip,
-  Tabs,
-  Tab,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Alert,
-  LinearProgress
-} from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon,
-  Cancel as CancelIcon,
-  Flag as FlagIcon,
-  ArrowBack as ArrowBackIcon,
-  AssignmentTurnedIn as AssignmentTurnedInIcon,
-  AccessTime as AccessTimeIcon,
-  Timeline as TimelineIcon
+    AccessTime as AccessTimeIcon,
+    ArrowBack as ArrowBackIcon,
+    AssignmentTurnedIn as AssignmentTurnedInIcon,
+    Cancel as CancelIcon,
+    CheckCircle as CheckCircleIcon,
+    Flag as FlagIcon,
+    Timeline as TimelineIcon
 } from '@mui/icons-material';
+import {
+    Alert,
+    Box,
+    Button,
+    Card,
+    CardContent,
+    Chip,
+    CircularProgress,
+    Container,
+    Divider,
+    Grid,
+    LinearProgress,
+    List,
+    ListItem,
+    ListItemIcon,
+    ListItemText,
+    Paper,
+    Tab,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    Tabs,
+    Typography
+} from '@mui/material';
+import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
 // Mock submission data
