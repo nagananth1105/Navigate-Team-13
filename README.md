@@ -70,7 +70,7 @@ ai_services/
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/your-organization/Navigate.git
+git clone https://github.com/prabha55555/Navigate-Team-13
 cd Navigate
 ```
 
@@ -182,4 +182,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Acknowledgments
 
 - Thanks to all contributors who have helped shape Navigate
-- Special thanks to [Your University/Organization] for supporting this capstone project
+- Special thanks to Navigate Labs for supporting this capstone project
